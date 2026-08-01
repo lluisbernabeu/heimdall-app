@@ -83,6 +83,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
     final st = _story!;
     final race = (st['race'] as Map? ?? {});
     final summary = (st['summary'] as Map? ?? {});
+    final noLaps = st['no_laps'] == true;
     final incidents = (st['incidents'] as List? ?? []);
     final ahead = (st['ahead'] as List? ?? []);
     final posEvents = (st['position_events'] as List? ?? []);
@@ -131,10 +132,10 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('${race['track_name']}',
+                  Text('${race['track_name'] ?? ''}',
                       style: const TextStyle(color: AppColors.text, fontSize: 17,
                           fontWeight: FontWeight.w800)),
-                  Text('${race['event_name']}',
+                  Text('${race['event_name'] ?? ''}',
                       style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
                   const SizedBox(height: 8),
                   Text(verdictText,
@@ -326,10 +327,14 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
           ],
 
           if (incidents.isEmpty && ahead.isEmpty && posEvents.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Sin datos de vueltas detalladas para esta carrera.',
-                  textAlign: TextAlign.center, style: TextStyle(color: AppColors.textDim)),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                  noLaps
+                      ? 'No hay datos de vueltas descargadas para esta carrera todavía. Pulsa el botón de sincronizar para intentar descargarlas.'
+                      : 'Sin datos de vueltas detalladas para esta carrera.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.textDim)),
             ),
         ],
       ),
