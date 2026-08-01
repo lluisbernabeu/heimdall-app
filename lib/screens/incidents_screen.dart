@@ -132,6 +132,67 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
           ),
         ),
         const SizedBox(height: 16),
+        const Text('Por carrera',
+            style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        ...(_data!['by_race'] as List? ?? []).map((raw) {
+          final r = Map<String, dynamic>.from(raw as Map);
+          final counts = Map<String, dynamic>.from(r['counts'] as Map? ?? {});
+          final chips = counts.entries.map((e) =>
+              '${typeLabel(e.key)}: ${e.value}').join(' · ');
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: (r['total'] as num? ?? 0) >= 4
+                    ? AppColors.red.withValues(alpha: 0.35)
+                    : AppColors.surfaceAlt,
+              ),
+            ),
+            child: Row(children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: (r['total'] as num? ?? 0) >= 4
+                      ? AppColors.red.withValues(alpha: 0.13)
+                      : AppColors.gold.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                alignment: Alignment.center,
+                child: Text('${r['total'] ?? 0}',
+                    style: TextStyle(
+                      color: (r['total'] as num? ?? 0) >= 4
+                          ? AppColors.red : AppColors.gold,
+                      fontSize: 17, fontWeight: FontWeight.w900,
+                    )),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${r['track_name'] ?? '—'}',
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.text,
+                          fontSize: 13.5, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text('${r['event_name'] != null && r['event_name'] != '' ? '${r['event_name']} · ' : ''}${fmtDateHora(r['race_date'])}'
+                      '${r['finish_pos'] != null ? ' · P${r['finish_pos']}' : ''}',
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(chips,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+              ),
+            ]),
+          );
+        }),
+        const SizedBox(height: 16),
         const Text('Tipos de incidente',
             style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),

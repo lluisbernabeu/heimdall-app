@@ -244,3 +244,16 @@ String fmtDate(Object? iso) {
   if (mi == null || mi < 1 || mi > 12) return s.substring(0, 10);
   return '$d ${meses[mi - 1]} $y';
 }
+
+/// Fecha + hora: "20 jul 2026 · 18:20". Para distinguir carreras del mismo día.
+String fmtDateHora(Object? iso) {
+  if (iso == null) return '';
+  final base = fmtDate(iso);
+  final s = iso.toString();
+  if (s.length >= 16) {
+    final hh = s.substring(11, 13);
+    final mm = s.substring(14, 16);
+    return '$base · $hh:$mm';
+  }
+  return base;
+}
