@@ -93,7 +93,7 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
             dense: true,
             leading: Icon(Icons.speed, color: std <= avgStd ? AppColors.green : AppColors.gold, size: 18),
             title: Text('${m['track_name']}', style: const TextStyle(color: AppColors.text, fontSize: 13)),
-            subtitle: Text('${m['race_date']?.toString().substring(0, 10)} · ${m['laps']} vueltas',
+            subtitle: Text('${fmtDate(m['race_date'])} · ${m['laps']} vueltas',
                 style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
             trailing: Text('σ ${(std / 1000).toStringAsFixed(3)}s',
                 style: TextStyle(color: std <= avgStd ? AppColors.green : AppColors.gold,

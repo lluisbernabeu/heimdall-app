@@ -111,7 +111,7 @@ class _RaceCard extends StatelessWidget {
                   const Icon(Icons.star, color: AppColors.gold, size: 14),
                 ],
               ]),
-              Text('${r['event_name']} · ${r['race_date']?.toString().substring(0, 10)}',
+              Text('${r['event_name']} · ${fmtDate(r['race_date'])}',
                   style: const TextStyle(color: AppColors.textDim, fontSize: 11),
                   maxLines: 1, overflow: TextOverflow.ellipsis),
             ]),

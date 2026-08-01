@@ -362,7 +362,7 @@ class _SummaryTab extends StatelessWidget {
                     def: 'Tu nota de seguridad. Sube con carreras limpias (pocos incidentes) y baja con choques, salidas de pista y sanciones. Determina tu licencia.'),
                 _GlossaryItem(
                     term: 'Incidentes',
-                    def: 'Contactos y sanciones de LFM: C = contacto, D = drive-through (sanción), O = fuera de pista. Menos es siempre mejor.'),
+                    def: 'Lo que LFM registra: C = cut (cortaste la pista y la vuelta no cuenta), D = contacto/daño, O = fuera de pista. Menos es siempre mejor.'),
                 _GlossaryItem(
                     term: 'Split',
                     def: 'Grupo de pilotos de nivel parecido en una misma carrera. Los splits se numeran: split 1 = los más rápidos.'),
@@ -671,7 +671,7 @@ class _RaceTile extends StatelessWidget {
                   const Icon(Icons.star, color: AppColors.gold, size: 14),
                 ],
               ]),
-              Text('${r['event_name']} · ${r['race_date']?.toString().substring(0, 10)}',
+              Text('${r['event_name']} · ${fmtDate(r['race_date'])}',
                   style: const TextStyle(color: AppColors.textDim, fontSize: 11),
                   maxLines: 1, overflow: TextOverflow.ellipsis),
             ]),

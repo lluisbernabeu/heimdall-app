@@ -98,6 +98,16 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
             ? 'Ganaste $gained posiciones (P$startPos → P$finishPos)'
             : 'Perdiste ${-gained} posiciones (P$startPos → P$finishPos)';
 
+    final laps = (st['laps'] as List? ?? []).cast<Map>();
+    // mejor vuelta válida para mostrar el gap de cada vuelta
+    num? bestValidMs;
+    for (final l in laps) {
+      if (l['valid'] == true && l['time_ms'] != null) {
+        final t = l['time_ms'] as num;
+        if (bestValidMs == null || t < bestValidMs) bestValidMs = t;
+      }
+    }
+
     return RefreshIndicator(
       onRefresh: _load,
       color: AppColors.gold,
@@ -210,6 +220,73 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
             const SizedBox(height: 8),
           ],
 
+          // Vuelta a vuelta (análisis detallado)
+          if (laps.isNotEmpty) ...[
+            const Text('Tus vueltas, una a una',
+                style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w800, fontSize: 15)),
+            const SizedBox(height: 4),
+            Text('Toca una vuelta para ver qué pasó en ella.',
+                style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.surfaceAlt),
+              ),
+              child: Column(children: [
+                for (final l in laps)
+                  InkWell(
+                    onTap: () => _showLapDetail(context, l, bestValidMs),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                      child: Row(children: [
+                        SizedBox(
+                          width: 34,
+                          child: Text('V${l['lap']}',
+                              style: const TextStyle(color: AppColors.textDim, fontSize: 12,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                        Expanded(
+                          child: Text(
+                            l['valid'] == true ? _fmt(l['time_ms']) : '${_fmt(l['time_ms'])} ✂️',
+                            style: TextStyle(
+                                color: l['valid'] == true ? AppColors.text : AppColors.red,
+                                fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        if (l['position'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Text('P${l['position']}',
+                                style: const TextStyle(color: AppColors.cyan, fontSize: 12,
+                                    fontWeight: FontWeight.w700)),
+                          ),
+                        if (bestValidMs != null && l['time_ms'] != null &&
+                            l['valid'] == true)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Text(
+                                '+${(((l['time_ms'] as num) - bestValidMs) / 1000).toStringAsFixed(2)}s',
+                                style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+                          ),
+                        if ((l['incidents'] as List? ?? []).isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Text('${(l['incidents'] as List).length}⚠️',
+                                style: const TextStyle(color: AppColors.red, fontSize: 11,
+                                    fontWeight: FontWeight.w800)),
+                          ),
+                        const Icon(Icons.chevron_right, color: AppColors.textDim, size: 18),
+                      ]),
+                    ),
+                  ),
+              ]),
+            ),
+            const SizedBox(height: 8),
+          ],
+
           // Qué hacen los mejores
           if (ahead.isNotEmpty) ...[
             const Text('¿Qué hacen los que van delante?',
@@ -266,7 +343,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
     final lapChart = (_data!['lap_chart'] as List? ?? []).cast<Map>();
     final myUid = _data!['my_user_id'];
     final dateStr = race['race_date']?.toString();
-    final dateShort = (dateStr != null && dateStr.length >= 10) ? dateStr.substring(0, 10) : '';
+    final dateShort = fmtDate(dateStr);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -432,6 +509,155 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
         ),
       ],
     ));
+  }
+
+  /// Bottom sheet: detalle completo de una vuelta concreta.
+  void _showLapDetail(BuildContext context, Map lap, num? bestValidMs) {
+    final lapNum = lap['lap'];
+    final valid = lap['valid'] == true;
+    final timeMs = lap['time_ms'];
+    final gap = (bestValidMs != null && timeMs != null && valid)
+        ? ((timeMs as num) - bestValidMs) / 1000.0 : null;
+    final incs = (lap['incidents'] as List? ?? []).cast<Map>();
+    final s1 = lap['s1_ms'], s2 = lap['s2_ms'], s3 = lap['s3_ms'];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.62,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (ctx, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.all(20),
+          children: [
+            Center(
+              child: Container(
+                width: 44, height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.textDim.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(children: [
+              Text('Vuelta $lapNum',
+                  style: const TextStyle(color: AppColors.text, fontSize: 22,
+                      fontWeight: FontWeight.w800)),
+              const Spacer(),
+              if (lap['position'] != null)
+                _chip('P${lap['position']}', AppColors.cyan),
+              const SizedBox(width: 6),
+              _chip(valid ? 'Válida' : 'No contó', valid ? AppColors.green : AppColors.red),
+            ]),
+            const SizedBox(height: 16),
+            // Tiempo total
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Tiempo de vuelta',
+                        style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+                    const SizedBox(height: 4),
+                    Text(valid ? _fmt(timeMs) : '${_fmt(timeMs)} (no contó)',
+                        style: TextStyle(
+                            color: valid ? AppColors.text : AppColors.red,
+                            fontSize: 26, fontWeight: FontWeight.w800)),
+                    if (gap != null)
+                      Text('+${gap.toStringAsFixed(2)}s vs tu mejor',
+                          style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
+                  ]),
+                ),
+                if (valid)
+                  Icon(Icons.check_circle, color: AppColors.green, size: 34)
+                else
+                  Icon(Icons.block, color: AppColors.red, size: 34),
+              ]),
+            ),
+            const SizedBox(height: 14),
+            // Splits
+            const Text('Sectores',
+                style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700, fontSize: 14)),
+            const SizedBox(height: 8),
+            Row(children: [
+              _splitBox('S1', s1),
+              const SizedBox(width: 8),
+              _splitBox('S2', s2),
+              const SizedBox(width: 8),
+              _splitBox('S3', s3),
+            ]),
+            const SizedBox(height: 14),
+            // Incidentes de esta vuelta
+            if (incs.isNotEmpty) ...[
+              const Text('Qué pasó en esta vuelta',
+                  style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 8),
+              ...incs.map((i) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.red.withValues(alpha: 0.4)),
+                ),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${i['icon'] ?? '⚠️'}', style: const TextStyle(fontSize: 20)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('${i['type_label'] ?? i['type']}',
+                          style: const TextStyle(color: AppColors.red, fontSize: 13,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 3),
+                      Text('${i['explanation'] ?? ''}',
+                          style: const TextStyle(color: AppColors.textDim, fontSize: 12, height: 1.3)),
+                    ]),
+                  ),
+                ]),
+              )),
+            ] else ...[
+              const Text('Qué pasó en esta vuelta',
+                  style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 6),
+              const Text('Sin incidentes. Vuelta limpia.',
+                  style: TextStyle(color: AppColors.textDim, fontSize: 12)),
+            ],
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _splitBox(String label, dynamic ms) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceAlt,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(children: [
+          Text(label, style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+          const SizedBox(height: 4),
+          Text(_fmt(ms),
+              style: const TextStyle(color: AppColors.cyan, fontSize: 15,
+                  fontWeight: FontWeight.w700)),
+        ]),
+      ),
+    );
   }
 
   Widget _chip(String text, Color color) {

@@ -92,7 +92,7 @@ class _SectorCard extends StatelessWidget {
           Text('Split ${m['split']}',
               style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
         ]),
-        Text('${m['race_date']?.toString().substring(0, 10)}',
+        Text(fmtDate(m['race_date']),
             style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
         const SizedBox(height: 10),
         Row(children: [

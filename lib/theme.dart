@@ -151,7 +151,8 @@ class GoldButton extends StatelessWidget {
   }
 }
 
-/// Logo de Heimdall — bandera a cuadros dorada en marco redondeado (reutilizable).
+/// Logo de Heimdall — bandera a cuadros dorada dibujada con CustomPainter
+/// (contraste nítido a cualquier tamaño, sin depender de assets).
 class HeimdallLogo extends StatelessWidget {
   final double size;
   const HeimdallLogo({super.key, this.size = 64});
@@ -162,29 +163,84 @@ class HeimdallLogo extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(size * 0.22),
+        borderRadius: BorderRadius.circular(size * 0.24),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Color(0xFF1A2C44), Color(0xFF0D1B2E)],
         ),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.45), width: 1.5),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.55), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.25),
-            blurRadius: 22,
+            color: AppColors.gold.withValues(alpha: 0.22),
+            blurRadius: 18,
             spreadRadius: 1,
           ),
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(size * 0.13),
-        child: Image.asset(
-          'assets/images/horn.png',
-          fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => Icon(Icons.flag, color: AppColors.gold, size: size * 0.5),
+        padding: EdgeInsets.all(size * 0.12),
+        child: CustomPaint(
+          painter: _CheckerFlagPainter(),
+          size: Size.square(size * 0.76),
         ),
       ),
     );
   }
+}
+
+/// Bandera a cuadros: cuadros dorados + azul noche, asta dorada.
+class _CheckerFlagPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final pole = Paint()
+      ..color = const Color(0xFFF5C469)
+      ..strokeWidth = w * 0.07
+      ..strokeCap = StrokeCap.round;
+    // asta
+    canvas.drawLine(
+        Offset(w * 0.06, h * 0.02), Offset(w * 0.06, h * 0.98), pole);
+    // bandera (rectángulo con ligera inclinación)
+    final flagLeft = w * 0.12;
+    final flagTop = h * 0.08;
+    final flagW = w * 0.82;
+    final flagH = h * 0.62;
+    const cols = 5, rows = 4;
+    final cellW = flagW / cols, cellH = flagH / rows;
+    final light = Paint()..color = const Color(0xFFF5C469);   // dorado brillante
+    final dark = Paint()..color = const Color(0xFF0D1B2E);    // azul noche
+    for (int r = 0; r < rows; r++) {
+      for (int c = 0; c < cols; c++) {
+        final rect = Rect.fromLTWH(
+            flagLeft + c * cellW, flagTop + r * cellH, cellW, cellH);
+        canvas.drawRect(rect, (r + c) % 2 == 0 ? light : dark);
+      }
+    }
+    // contorno de la bandera
+    canvas.drawRect(
+        Rect.fromLTWH(flagLeft, flagTop, flagW, flagH),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = w * 0.02
+          ..color = const Color(0xFFF5C469));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Formatea '2026-07-31T...' o '2026-07-31' como '31 jul 2026' (es-ES).
+String fmtDate(Object? iso) {
+  if (iso == null) return '';
+  final s = iso.toString();
+  if (s.length < 10) return s;
+  final y = s.substring(0, 4);
+  final m = s.substring(5, 7);
+  final d = s.substring(8, 10);
+  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun',
+                 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  final mi = int.tryParse(m);
+  if (mi == null || mi < 1 || mi > 12) return s.substring(0, 10);
+  return '$d ${meses[mi - 1]} $y';
 }

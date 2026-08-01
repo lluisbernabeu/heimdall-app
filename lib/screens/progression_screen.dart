@@ -71,7 +71,7 @@ class _ProgressionScreenState extends State<ProgressionScreen> {
               ? AppColors.gold : AppColors.textDim, size: 18),
           title: Text('${p['track']}',
               style: const TextStyle(color: AppColors.text, fontSize: 13)),
-          subtitle: Text('${p['date']?.toString().substring(0, 10)} · P${p['finish_pos']}',
+          subtitle: Text('${fmtDate(p['date'])} · P${p['finish_pos']}',
               style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
           trailing: Text('${(p['rating'] as num).round()}',
               style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.w800)),
