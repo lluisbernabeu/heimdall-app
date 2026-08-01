@@ -6,6 +6,7 @@ class AppColors {
   static const Color surface = Color(0xFF111E2E);  // tarjetas
   static const Color surfaceAlt = Color(0xFF16283C);
   static const Color gold = Color(0xFFE8A33D);     // dorado Heimdall
+  static const Color goldLight = Color(0xFFF5C469);
   static const Color cyan = Color(0xFF3DD6E8);     // cian telemetría
   static const Color red = Color(0xFFE83D4A);      // incidentes/negativo
   static const Color green = Color(0xFF3DE87A);    // positivo/SR
@@ -98,17 +99,25 @@ class HeimdallLogo extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFE8A33D), Color(0xFFB97A1F)],
+          colors: [Color(0xFF1A2C44), Color(0xFF0D1B2E)],
         ),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.35), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.35),
+            color: AppColors.gold.withValues(alpha: 0.30),
             blurRadius: 24,
             spreadRadius: 2,
           ),
         ],
       ),
-      child: Icon(Icons.graphic_eq_rounded, color: const Color(0xFF0A1420), size: size * 0.55),
+      child: Padding(
+        padding: EdgeInsets.all(size * 0.16),
+        child: Image.asset(
+          'assets/images/horn.png',
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) => Icon(Icons.rowing, color: AppColors.gold, size: size * 0.5),
+        ),
+      ),
     );
   }
 }
