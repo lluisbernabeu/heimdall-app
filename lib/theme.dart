@@ -102,11 +102,11 @@ class GoldButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: (loading || onPressed == null) ? null : onPressed,
+    return Material(
+      color: Colors.transparent,
       child: Ink(
-        height: 52,
+        height: 54,
+        width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           gradient: const LinearGradient(
@@ -116,30 +116,35 @@ class GoldButton extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.gold.withValues(alpha: 0.35),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              color: AppColors.gold.withValues(alpha: 0.45),
+              blurRadius: 16,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
-        child: Center(
-          child: loading
-              ? const SizedBox(
-                  width: 22, height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0A1420)))
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (icon != null) ...[
-                      Icon(icon, color: const Color(0xFF0A1420), size: 20),
-                      const SizedBox(width: 8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: (loading || onPressed == null) ? null : onPressed,
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 22, height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0A1420)))
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (icon != null) ...[
+                        Icon(icon, color: const Color(0xFF0A1420), size: 20),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(label,
+                          style: const TextStyle(
+                              fontSize: 17, fontWeight: FontWeight.w800,
+                              letterSpacing: 0.3,
+                              color: Color(0xFF0A1420))),
                     ],
-                    Text(label,
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w800,
-                            color: Color(0xFF0A1420))),
-                  ],
-                ),
+                  ),
+          ),
         ),
       ),
     );

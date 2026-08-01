@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0A1420), Color(0xFF0D1B2E)],
+            colors: [Color(0xFF0A1420), Color(0xFF0D1B2E), Color(0xFF111E2E)],
           ),
         ),
         child: SafeArea(
@@ -58,12 +58,28 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const HeimdallLogo(size: 84),
-                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft, end: Alignment.bottomRight,
+                        colors: [AppColors.goldLight, AppColors.gold],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.gold.withValues(alpha: 0.35),
+                          blurRadius: 30, spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const HeimdallLogo(size: 84),
+                  ),
+                  const SizedBox(height: 24),
                   const Text('HEIMDALL',
                       style: TextStyle(
-                          fontSize: 30, fontWeight: FontWeight.w800,
-                          letterSpacing: 6, color: AppColors.text)),
+                          fontSize: 30, fontWeight: FontWeight.w900,
+                          letterSpacing: 8, color: AppColors.text)),
                   const SizedBox(height: 6),
                   Text('Analítica de Low Fuel Motorsport',
                       style: TextStyle(color: AppColors.textDim, fontSize: 14)),

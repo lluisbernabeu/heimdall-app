@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
 
-/// Comparativa: tú vs otro perfil vinculado del mismo usuario.
+/// Comparativa: tú vs cualquier piloto del sistema (tus perfiles u otros).
 class CompareScreen extends StatefulWidget {
   const CompareScreen({super.key});
   @override
@@ -10,7 +10,7 @@ class CompareScreen extends StatefulWidget {
 }
 
 class _CompareScreenState extends State<CompareScreen> {
-  List<dynamic> _profiles = [];
+  List<Map<String, dynamic>> _profiles = [];
   int? _a, _b;
   Map<String, dynamic>? _data;
   bool _loading = true;
@@ -22,10 +22,22 @@ class _CompareScreenState extends State<CompareScreen> {
   Future<void> _load() async {
     try {
       final me = await ApiClient.get('/api/me');
-      final ps = (me['profiles'] as List? ?? []);
+      final mine = (me['profiles'] as List? ?? []).cast<Map>();
+      final all = (await ApiClient.get('/api/profiles') as List).cast<Map>();
+      final profiles = <Map<String, dynamic>>[
+        for (final p in mine) Map<String, dynamic>.from(p),
+        for (final p in all)
+          if (!mine.any((m) => m['id'] == p['id']))
+            Map<String, dynamic>.from(p),
+      ];
       setState(() {
-        _profiles = ps;
-        if (ps.length >= 2) { _a = (ps[0] as Map)['id'] as int; _b = (ps[1] as Map)['id'] as int; }
+        _profiles = profiles;
+        if (profiles.isNotEmpty) _a = (profiles.first)['id'] as int;
+        // Por defecto B = el primero que no sea A (Josema)
+        if (profiles.length >= 2) {
+          _b = profiles.firstWhere(
+              (p) => p['id'] != _a, orElse: () => profiles.first)['id'] as int;
+        }
         _loading = false;
       });
       if (_a != null && _b != null) await _compare();
@@ -51,10 +63,13 @@ class _CompareScreenState extends State<CompareScreen> {
       body: _loading && _data == null
           ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
           : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.red)))
+              ? Center(child: Padding(padding: const EdgeInsets.all(32),
+                  child: Text(_error!, textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.red))))
               : _profiles.length < 2
                   ? const Center(child: Padding(padding: EdgeInsets.all(32),
-                      child: Text('Necesitas al menos 2 perfiles LFM vinculados para comparar.',
+                      child: Text('Necesitas al menos 2 pilotos con datos para comparar.\n'
+                          'Sincroniza tu perfil o el de otro piloto.',
                           textAlign: TextAlign.center, style: TextStyle(color: AppColors.textDim))))
                   : _body(),
     );
@@ -63,40 +78,44 @@ class _CompareScreenState extends State<CompareScreen> {
   Widget _body() {
     final a = Map<String, dynamic>.from((_data?['a'] as Map? ?? {}));
     final b = Map<String, dynamic>.from((_data?['b'] as Map? ?? {}));
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Selectores
-        Row(children: [
-          Expanded(child: _picker(_a, (v) { _a = v; _compare(); }, 'A')),
-          const SizedBox(width: 12),
-          Expanded(child: _picker(_b, (v) { _b = v; _compare(); }, 'B')),
-        ]),
-        const SizedBox(height: 20),
+    return RefreshIndicator(
+      onRefresh: _compare,
+      color: AppColors.gold,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Selectores
+          Row(children: [
+            Expanded(child: _picker(_a, (v) { _a = v; _compare(); }, 'A')),
+            const SizedBox(width: 12),
+            Expanded(child: _picker(_b, (v) { _b = v; _compare(); }, 'B')),
+          ]),
+          const SizedBox(height: 20),
 
-        // Cabeceras
-        Row(children: [
-          Expanded(child: _header(a)),
-          const Padding(padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Text('VS', style: TextStyle(color: AppColors.gold,
-                  fontWeight: FontWeight.w900, fontSize: 16))),
-          Expanded(child: _header(b)),
-        ]),
-        const SizedBox(height: 16),
+          // Cabeceras
+          Row(children: [
+            Expanded(child: _header(a)),
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('VS', style: TextStyle(color: AppColors.gold,
+                    fontWeight: FontWeight.w900, fontSize: 16))),
+            Expanded(child: _header(b)),
+          ]),
+          const SizedBox(height: 16),
 
-        // Métricas
-        _row('Carreras', '${a['races'] ?? 0}', '${b['races'] ?? 0}'),
-        _row('Victorias', '${a['wins'] ?? 0}', '${b['wins'] ?? 0}'),
-        _row('Podios', '${a['podiums'] ?? 0}', '${b['podiums'] ?? 0}'),
-        _row('Avg finish', '${a['avg_finish'] ?? '—'}', '${b['avg_finish'] ?? '—'}'),
-        _row('Avg incidentes', '${a['avg_incidents'] ?? '—'}', '${b['avg_incidents'] ?? '—'}'),
-        _row('Mejor vuelta', a['best_lap'] ?? '—', b['best_lap'] ?? '—'),
-        _row('Consistencia (σ)', '${a['consistency_std_ms'] != null ? (a['consistency_std_ms'] / 1000).toStringAsFixed(3) + 's' : '—'}',
-            '${b['consistency_std_ms'] != null ? (b['consistency_std_ms'] / 1000).toStringAsFixed(3) + 's' : '—'}'),
-        _row('Licencia', '${a['license'] ?? '—'}', '${b['license'] ?? '—'}'),
-        _row('SR', '${a['safety_rating'] ?? '—'}', '${b['safety_rating'] ?? '—'}'),
-        _row('Rating', '${a['rating'] ?? '—'}', '${b['rating'] ?? '—'}'),
-      ],
+          // Métricas
+          _row('Carreras', '${a['races'] ?? 0}', '${b['races'] ?? 0}'),
+          _row('Victorias', '${a['wins'] ?? 0}', '${b['wins'] ?? 0}'),
+          _row('Podios', '${a['podiums'] ?? 0}', '${b['podiums'] ?? 0}'),
+          _row('Avg finish', '${a['avg_finish'] ?? '—'}', '${b['avg_finish'] ?? '—'}'),
+          _row('Avg incidentes', '${a['avg_incidents'] ?? '—'}', '${b['avg_incidents'] ?? '—'}'),
+          _row('Mejor vuelta', a['best_lap'] ?? '—', b['best_lap'] ?? '—'),
+          _row('Consistencia (σ)', '${a['consistency_std_ms'] != null ? (a['consistency_std_ms'] / 1000).toStringAsFixed(3) + 's' : '—'}',
+              '${b['consistency_std_ms'] != null ? (b['consistency_std_ms'] / 1000).toStringAsFixed(3) + 's' : '—'}'),
+          _row('Licencia', '${a['license'] ?? '—'}', '${b['license'] ?? '—'}'),
+          _row('SR', '${a['safety_rating'] ?? '—'}', '${b['safety_rating'] ?? '—'}'),
+          _row('Rating', '${a['rating'] ?? '—'}', '${b['rating'] ?? '—'}'),
+        ],
+      ),
     );
   }
 
@@ -112,7 +131,7 @@ class _CompareScreenState extends State<CompareScreen> {
       items: [
         for (final p in _profiles)
           DropdownMenuItem(
-            value: (p as Map)['id'] as int,
+            value: p['id'] as int,
             child: Text('${p['username'] ?? p['vorname'] ?? ''} ${p['nachname'] ?? ''}'.trim(),
                 style: const TextStyle(fontSize: 13)),
           ),

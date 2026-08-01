@@ -10,6 +10,7 @@ import 'screens/sectors_screen.dart';
 import 'screens/consistency_screen.dart';
 import 'screens/incidents_screen.dart';
 import 'screens/compare_screen.dart';
+import 'screens/races_screen.dart';
 
 void main() => runApp(const HeimdallApp());
 
@@ -35,6 +36,8 @@ class HeimdallApp extends StatelessWidget {
         '/analysis/consistency': (_) => const ConsistencyScreen(),
         '/analysis/incidents': (_) => const IncidentsScreen(),
         '/analysis/compare': (_) => const CompareScreen(),
+        '/analysis/races': (_) => RacesScreen(
+            profileId: ModalRoute.of(context)!.settings.arguments as int),
       },
     );
   }

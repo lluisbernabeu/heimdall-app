@@ -109,18 +109,34 @@ class _HomeScreenState extends State<HomeScreen> {
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft, end: Alignment.bottomRight,
-                colors: [Color(0xFF16283C), Color(0xFF0D1B2E)],
+                colors: [Color(0xFF1A2C44), Color(0xFF0D1B2E)],
               ),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.surfaceAlt),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 18, offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: Row(children: [
-              ClipOval(
-                child: (p['avatar'] as String? ?? '').isNotEmpty
-                    ? Image.network(p['avatar'] as String,
-                        width: 64, height: 64, fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const _AvatarFallback())
-                    : const _AvatarFallback(),
+              Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    colors: [AppColors.goldLight, AppColors.gold],
+                  ),
+                ),
+                child: ClipOval(
+                  child: (p['avatar'] as String? ?? '').isNotEmpty
+                      ? Image.network(p['avatar'] as String,
+                          width: 62, height: 62, fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const _AvatarFallback())
+                      : const _AvatarFallback(),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -189,32 +205,40 @@ class _HomeScreenState extends State<HomeScreen> {
           // Botones de análisis
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Wrap(spacing: 8, runSpacing: 8, children: [
-              _ActionChip(icon: Icons.show_chart, label: 'Progresión',
-                  onTap: () => _push('/analysis/progression', 'Progresión')),
-              _ActionChip(icon: Icons.timer_outlined, label: 'Sectores',
-                  onTap: () => _push('/analysis/sectors', 'Sectores')),
-              _ActionChip(icon: Icons.speed, label: 'Consistencia',
-                  onTap: () => _push('/analysis/consistency', 'Consistencia')),
-              _ActionChip(icon: Icons.report, label: 'Incidentes',
-                  onTap: () => _push('/analysis/incidents', 'Incidentes')),
-              _ActionChip(icon: Icons.compare_arrows, label: 'Comparar',
-                  onTap: () => _push('/analysis/compare', 'Comparar')),
+            child: Column(children: [
+              _ActionRow(icon: Icons.show_chart, label: 'Progresión',
+                  onTap: () => _push('/analysis/progression')),
+              _ActionRow(icon: Icons.timer_outlined, label: 'Sectores',
+                  onTap: () => _push('/analysis/sectors')),
+              _ActionRow(icon: Icons.speed, label: 'Consistencia',
+                  onTap: () => _push('/analysis/consistency')),
+              _ActionRow(icon: Icons.report, label: 'Incidentes',
+                  onTap: () => _push('/analysis/incidents')),
+              _ActionRow(icon: Icons.compare_arrows, label: 'Comparar',
+                  onTap: () => _push('/analysis/compare')),
             ]),
           ),
 
           // Últimas carreras
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-            child: Text('Últimas carreras',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
-                    color: AppColors.text)),
+            child: Row(children: [
+              Text('Últimas carreras',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                      color: AppColors.text)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, color: AppColors.textDim),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _push('/analysis/races'),
+              ),
+            ]),
           ),
           ...lastRaces.map<Widget>((r) => _RaceTile(
                 r: Map<String, dynamic>.from(r as Map),
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => RaceDetailScreen(
-                        profileId: _profileId!, raceId: r['id'] as int))),
+                        profileId: _profileId!, raceId: r['race_id'] as int))),
               )),
           if (lastRaces.isEmpty)
             const Padding(
@@ -228,7 +252,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _push(String route, String title) {
+  void _push(String route) {
+    if (route == '/analysis/races') {
+      Navigator.of(context).pushNamed(route, arguments: _profileId);
+      return;
+    }
     Navigator.of(context).pushNamed(route);
   }
 
@@ -244,7 +272,7 @@ class _AvatarFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 64, height: 64,
+      width: 62, height: 62,
       color: AppColors.surfaceAlt,
       child: const Icon(Icons.person, color: AppColors.textDim, size: 34),
     );
@@ -277,16 +305,27 @@ class _StatCard extends StatelessWidget {
     return Expanded(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 3),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.surfaceAlt),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: [AppColors.surface, AppColors.surfaceAlt.withValues(alpha: 0.55)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Column(children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 6),
-          Text(value, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w800)),
+          Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(height: 8),
+          Text(value, style: TextStyle(color: color, fontSize: 17, fontWeight: FontWeight.w900)),
           const SizedBox(height: 2),
           Text(label, style: const TextStyle(color: AppColors.textDim, fontSize: 10)),
         ]),
@@ -295,26 +334,38 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _ActionChip extends StatelessWidget {
+class _ActionRow extends StatelessWidget {
   final IconData icon; final String label; final VoidCallback onTap;
-  const _ActionChip({required this.icon, required this.label, required this.onTap});
+  const _ActionRow({required this.icon, required this.label, required this.onTap});
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.surfaceAlt),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, color: AppColors.cyan, size: 16),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: AppColors.text, fontSize: 12,
-              fontWeight: FontWeight.w600)),
+        child: Row(children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.cyan.withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, color: AppColors.cyan, size: 17),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(label, style: const TextStyle(color: AppColors.text, fontSize: 14,
+                fontWeight: FontWeight.w600)),
+          ),
+          const Icon(Icons.chevron_right, color: AppColors.textDim, size: 20),
         ]),
       ),
     );
@@ -330,22 +381,28 @@ class _RaceTile extends StatelessWidget {
     final Color posColor = pos == 1 ? AppColors.gold : pos <= 3 ? AppColors.cyan : AppColors.text;
     final rc = (r['rating_change'] as num?)?.toDouble();
     final sc = (r['sr_change'] as num?)?.toDouble();
+    final bow = r['best_of_week'] == true;
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.surfaceAlt),
         ),
         child: Row(children: [
           Container(
-            width: 42, height: 42,
+            width: 44, height: 44,
             decoration: BoxDecoration(
-              color: posColor.withValues(alpha: 0.15),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                colors: [posColor.withValues(alpha: 0.28), posColor.withValues(alpha: 0.10)],
+              ),
               shape: BoxShape.circle,
+              border: Border.all(color: posColor.withValues(alpha: 0.5), width: 1.2),
             ),
             alignment: Alignment.center,
             child: Text('$pos',
@@ -354,10 +411,18 @@ class _RaceTile extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(r['track_name']?.toString() ?? '',
-                  style: const TextStyle(color: AppColors.text, fontSize: 14,
-                      fontWeight: FontWeight.w700),
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              Row(children: [
+                Flexible(
+                  child: Text(r['track_name']?.toString() ?? '',
+                      style: const TextStyle(color: AppColors.text, fontSize: 14,
+                          fontWeight: FontWeight.w700),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+                if (bow) ...[
+                  const SizedBox(width: 6),
+                  const Icon(Icons.star, color: AppColors.gold, size: 14),
+                ],
+              ]),
               Text('${r['event_name']} · ${r['race_date']?.toString().substring(0, 10)}',
                   style: const TextStyle(color: AppColors.textDim, fontSize: 11),
                   maxLines: 1, overflow: TextOverflow.ellipsis),

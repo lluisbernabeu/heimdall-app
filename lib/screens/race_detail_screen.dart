@@ -55,6 +55,8 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
     final lapChart = (_data!['lap_chart'] as List? ?? []).cast<Map>();
     final incidents = (_data!['incidents'] as List? ?? []).cast<Map>();
     final myUid = _data!['my_user_id'];
+    final dateStr = race['race_date']?.toString();
+    final dateShort = (dateStr != null && dateStr.length >= 10) ? dateStr.substring(0, 10) : '';
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -74,7 +76,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
             Text('${race['track_name']}',
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
                     color: AppColors.text)),
-            Text('${race['event_name']} · ${race['race_date']?.toString().substring(0, 10)}',
+            Text('${race['event_name']} · $dateShort',
                 style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
             const SizedBox(height: 12),
             Wrap(spacing: 10, runSpacing: 8, children: [
