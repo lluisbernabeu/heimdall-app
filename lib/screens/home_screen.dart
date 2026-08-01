@@ -4,7 +4,7 @@ import '../theme.dart';
 import 'loading_screen.dart';
 import 'race_detail_screen.dart';
 
-/// Home: resumen del piloto + KPIs principales.
+/// Home: qué está pasando (insight) + acceso a análisis.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -13,6 +13,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   Map<String, dynamic>? _data;
+  Map<String, dynamic>? _insight;
   int? _profileId;
   bool _loading = true;
   String? _error;
@@ -34,10 +35,14 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
       final pid = (profiles.first as Map)['id'] as int;
-      final data = await ApiClient.get('/api/profile/$pid/overview');
+      final results = await Future.wait([
+        ApiClient.get('/api/profile/$pid/overview'),
+        ApiClient.get('/api/profile/$pid/insight'),
+      ]);
       setState(() {
         _profileId = pid;
-        _data = Map<String, dynamic>.from(data as Map);
+        _data = Map<String, dynamic>.from(results[0] as Map);
+        _insight = Map<String, dynamic>.from(results[1] as Map);
         _loading = false;
       });
     } catch (e) {
@@ -91,21 +96,46 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Color _toneColor(String tone) {
+    switch (tone) {
+      case 'red': return AppColors.red;
+      case 'green': return AppColors.green;
+      case 'orange': return const Color(0xFFE8A33D);
+      default: return AppColors.cyan;
+    }
+  }
+
+  IconData _iconFor(String icon) {
+    switch (icon) {
+      case 'warning': return Icons.warning_amber_rounded;
+      case 'shield': return Icons.shield_rounded;
+      case 'sector': return Icons.timer_outlined;
+      case 'trophy': return Icons.emoji_events_rounded;
+      case 'target': return Icons.flag_rounded;
+      default: return Icons.lightbulb_outline;
+    }
+  }
+
   Widget _buildBody() {
     final d = _data!;
     final p = (d['profile'] as Map? ?? {});
-    final s = (d['stats'] as Map? ?? {});
+    final ins = _insight;
+    final verdict = (ins?['verdict'] as Map? ?? {});
+    final insights = (ins?['insights'] as List? ?? []);
+    final action = (ins?['action'] as Map? ?? {});
     final lastRaces = (d['last_races'] as List? ?? []);
+    final vColor = _toneColor(verdict['tone']?.toString() ?? 'cyan');
+
     return RefreshIndicator(
       onRefresh: _load,
       color: AppColors.gold,
       child: ListView(
         padding: const EdgeInsets.only(bottom: 30),
         children: [
-          // Cabecera del piloto
+          // ---- Cabecera piloto compacta ----
           Container(
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft, end: Alignment.bottomRight,
@@ -113,12 +143,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.35),
-                  blurRadius: 18, offset: const Offset(0, 8),
-                ),
-              ],
             ),
             child: Row(children: [
               Container(
@@ -133,78 +157,154 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ClipOval(
                   child: (p['avatar'] as String? ?? '').isNotEmpty
                       ? Image.network(p['avatar'] as String,
-                          width: 62, height: 62, fit: BoxFit.cover,
+                          width: 54, height: 54, fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => const _AvatarFallback())
                       : const _AvatarFallback(),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('${p['vorname'] ?? ''} ${p['nachname'] ?? ''}'.trim().isEmpty
                       ? (p['username'] ?? 'Piloto').toString()
                       : '${p['vorname'] ?? ''} ${p['nachname'] ?? ''}',
-                      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800,
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800,
                           color: AppColors.text)),
                   const SizedBox(height: 4),
-                  Row(children: [
-                    _Badge(text: p['license']?.toString() ?? '—',
-                        color: AppColors.cyan),
-                    const SizedBox(width: 6),
-                    _Badge(text: 'SR ${p['safety_rating']?.toString() ?? '—'}',
-                        color: AppColors.green),
-                    const SizedBox(width: 6),
-                    if (p['origin'] != null)
-                      _Badge(text: p['origin'].toString(), color: AppColors.gold),
+                  Wrap(spacing: 6, runSpacing: 4, children: [
+                    _Badge(text: p['license']?.toString() ?? '—', color: AppColors.cyan),
+                    _Badge(text: 'SR ${p['safety_rating']?.toString() ?? '—'}', color: AppColors.green),
+                    if (p['origin'] != null) _Badge(text: p['origin'].toString(), color: AppColors.gold),
                   ]),
-                  if (p['team_name'] != null) ...[
-                    const SizedBox(height: 6),
-                    Text('Equipo: ${p['team_name']}',
-                        style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
-                  ],
                 ]),
               ),
             ]),
           ),
 
-          // Stat cards
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(children: [
-              _StatCard(label: 'Carreras', value: '${s['races'] ?? 0}',
-                  icon: Icons.flag, color: AppColors.cyan),
-              _StatCard(label: 'Podios', value: '${s['podiums'] ?? 0}',
-                  icon: Icons.emoji_events, color: AppColors.gold),
-              _StatCard(label: 'Win rate', value: '${s['win_rate'] ?? 0}%',
-                  icon: Icons.military_tech, color: AppColors.green),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(children: [
-              _StatCard(label: 'Avg finish', value: '${s['avg_finish'] ?? '—'}',
-                  icon: Icons.trending_up, color: AppColors.cyan),
-              _StatCard(label: 'Avg inc.', value: '${s['avg_incidents'] ?? '—'}',
-                  icon: Icons.warning_amber, color: AppColors.red),
-              _StatCard(label: 'BOW ⭐', value: '${s['best_of_week'] ?? 0}',
-                  icon: Icons.star, color: AppColors.gold),
-            ]),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(children: [
-              _StatCard(label: 'Tend. rating (5)', value: _signed(s['rating_trend_5']),
-                  icon: Icons.show_chart, color: (s['rating_trend_5'] ?? 0) >= 0 ? AppColors.green : AppColors.red),
-              _StatCard(label: 'Tend. SR (5)', value: _signed(s['sr_trend_5']),
-                  icon: Icons.security, color: (s['sr_trend_5'] ?? 0) >= 0 ? AppColors.green : AppColors.red),
-              _StatCard(label: 'Mejor puesto', value: '${s['best_finish'] ?? '—'}',
-                  icon: Icons.workspace_premium, color: AppColors.cyan),
+          // ---- VEREDICTO (lo importante) ----
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                colors: [
+                  vColor.withValues(alpha: 0.22),
+                  AppColors.surface,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: vColor.withValues(alpha: 0.55), width: 1.2),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text('${verdict['emoji'] ?? '📊'}',
+                    style: const TextStyle(fontSize: 30)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('${verdict['title'] ?? 'Estado'}',
+                      style: TextStyle(
+                          color: vColor, fontSize: 22, fontWeight: FontWeight.w900,
+                          letterSpacing: 0.3)),
+                ),
+              ]),
+              const SizedBox(height: 10),
+              Text('${verdict['msg'] ?? ''}',
+                  style: const TextStyle(color: AppColors.text, fontSize: 14.5, height: 1.4)),
             ]),
           ),
 
-          // Botones de análisis
+          // ---- Señales interpretadas ----
+          ...insights.map<Widget>((raw) {
+            final i = Map<String, dynamic>.from(raw as Map);
+            final c = _toneColor(i['tone']?.toString() ?? 'cyan');
+            return Container(
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.surfaceAlt),
+              ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  width: 38, height: 38,
+                  decoration: BoxDecoration(
+                    color: c.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(_iconFor(i['icon']?.toString() ?? ''), color: c, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${i['title'] ?? ''}',
+                        style: TextStyle(color: c, fontSize: 14, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 3),
+                    Text('${i['msg'] ?? ''}',
+                        style: const TextStyle(color: AppColors.textDim, fontSize: 12.5, height: 1.35)),
+                  ]),
+                ),
+              ]),
+            );
+          }),
+
+          // ---- Qué hacer ahora ----
+          if (action.isNotEmpty) ...[
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  colors: [Color(0xFF16283C), Color(0xFF0D1B2E)],
+                ),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.gold.withValues(alpha: 0.5)),
+              ),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft, end: Alignment.bottomRight,
+                      colors: [AppColors.goldLight, AppColors.gold],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(_iconFor(action['icon']?.toString() ?? 'target'),
+                      color: const Color(0xFF0A1420), size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('QUÉ HACER AHORA',
+                        style: TextStyle(color: AppColors.gold, fontSize: 10.5,
+                            fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                    const SizedBox(height: 4),
+                    Text('${action['title'] ?? ''}',
+                        style: const TextStyle(color: AppColors.text, fontSize: 15,
+                            fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text('${action['msg'] ?? ''}',
+                        style: const TextStyle(color: AppColors.textDim, fontSize: 12.5, height: 1.35)),
+                  ]),
+                ),
+              ]),
+            ),
+          ],
+
+          // ---- Accesos rápidos ----
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+            child: Text('Análisis',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+                    color: AppColors.text)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(children: [
               _ActionRow(icon: Icons.show_chart, label: 'Progresión',
                   onTap: () => _push('/analysis/progression')),
@@ -219,22 +319,21 @@ class _HomeScreenState extends State<HomeScreen> {
             ]),
           ),
 
-          // Últimas carreras
+          // ---- Últimas carreras ----
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
             child: Row(children: [
               Text('Últimas carreras',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
                       color: AppColors.text)),
               const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.chevron_right, color: AppColors.textDim),
-                visualDensity: VisualDensity.compact,
+              TextButton(
                 onPressed: () => _push('/analysis/races'),
+                child: const Text('Ver todas', style: TextStyle(color: AppColors.cyan)),
               ),
             ]),
           ),
-          ...lastRaces.map<Widget>((r) => _RaceTile(
+          ...lastRaces.take(5).map<Widget>((r) => _RaceTile(
                 r: Map<String, dynamic>.from(r as Map),
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => RaceDetailScreen(
@@ -259,12 +358,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     Navigator.of(context).pushNamed(route);
   }
-
-  String _signed(dynamic v) {
-    if (v == null) return '—';
-    final n = (v as num).toDouble();
-    return n > 0 ? '+$n' : '$n';
-  }
 }
 
 class _AvatarFallback extends StatelessWidget {
@@ -272,9 +365,9 @@ class _AvatarFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 62, height: 62,
+      width: 54, height: 54,
       color: AppColors.surfaceAlt,
-      child: const Icon(Icons.person, color: AppColors.textDim, size: 34),
+      child: const Icon(Icons.person, color: AppColors.textDim, size: 30),
     );
   }
 }
@@ -292,44 +385,6 @@ class _Badge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(text, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label; final String value; final IconData icon; final Color color;
-  const _StatCard({required this.label, required this.value,
-      required this.icon, required this.color});
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 3),
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter, end: Alignment.bottomCenter,
-            colors: [AppColors.surface, AppColors.surfaceAlt.withValues(alpha: 0.55)],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-        ),
-        child: Column(children: [
-          Container(
-            width: 34, height: 34,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.14),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(height: 8),
-          Text(value, style: TextStyle(color: color, fontSize: 17, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 2),
-          Text(label, style: const TextStyle(color: AppColors.textDim, fontSize: 10)),
-        ]),
-      ),
     );
   }
 }
