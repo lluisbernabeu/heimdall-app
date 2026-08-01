@@ -48,8 +48,8 @@ class RaceCard extends StatelessWidget {
         child: Row(children: [
           // Badge de posición P#
           Container(
-            width: 50,
-            height: 50,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
@@ -85,9 +85,9 @@ class RaceCard extends StatelessWidget {
           const SizedBox(width: 12),
           // Logo del coche, grande
           Container(
-            width: 56,
-            height: 56,
-            padding: const EdgeInsets.all(5),
+            width: 64,
+            height: 64,
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: AppColors.surfaceAlt.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(12),
@@ -97,9 +97,9 @@ class RaceCard extends StatelessWidget {
                 ? Image.network(logo,
                     fit: BoxFit.contain,
                     errorBuilder: (_, _, _) => Icon(Icons.directions_car,
-                        color: AppColors.textDim, size: 28))
+                        color: AppColors.textDim, size: 32))
                 : Icon(Icons.directions_car,
-                    color: AppColors.textDim, size: 28),
+                    color: AppColors.textDim, size: 32),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -118,13 +118,13 @@ class RaceCard extends StatelessWidget {
                     ),
                     if (bow) ...[
                       const SizedBox(width: 6),
-                      const Icon(Icons.star, color: AppColors.gold, size: 18),
+                      const Icon(Icons.star, color: AppColors.gold, size: 20),
                     ],
                   ]),
                   const SizedBox(height: 3),
                   Row(children: [
                     const Icon(Icons.flag_outlined,
-                        color: AppColors.gold, size: 14),
+                        color: AppColors.gold, size: 16),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
