@@ -65,17 +65,77 @@ class _ProgressionScreenState extends State<ProgressionScreen> {
         const SizedBox(height: 12),
         SizedBox(height: 200, child: _lineChart(srs, minS, maxS, AppColors.green)),
         const SizedBox(height: 24),
-        ...pts.reversed.map((p) => ListTile(
-          dense: true,
-          leading: Icon(Icons.flag, color: (p['finish_pos'] as num) <= 3
-              ? AppColors.gold : AppColors.textDim, size: 18),
-          title: Text('${p['track']}',
-              style: const TextStyle(color: AppColors.text, fontSize: 13)),
-          subtitle: Text('${fmtDate(p['date'])} · P${p['finish_pos']}',
-              style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
-          trailing: Text('${(p['rating'] as num).round()}',
-              style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.w800)),
-        )),
+        ...pts.reversed.map((p) {
+          final pos = (p['finish_pos'] as num).toInt();
+          final Color posColor = pos == 1 ? AppColors.gold
+              : pos <= 3 ? AppColors.cyan : AppColors.text;
+          final rating = (p['rating'] as num).round();
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.surfaceAlt),
+            ),
+            child: Row(children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    colors: [posColor.withValues(alpha: 0.28),
+                        posColor.withValues(alpha: 0.10)],
+                  ),
+                  border: Border.all(
+                      color: posColor.withValues(alpha: 0.5), width: 1.2),
+                ),
+                alignment: Alignment.center,
+                child: Text('P$pos',
+                    style: TextStyle(color: posColor, fontSize: 12,
+                        fontWeight: FontWeight.w900)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${p['track']}',
+                          style: const TextStyle(
+                              color: AppColors.text,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Row(children: [
+                        const Icon(Icons.calendar_today,
+                            color: AppColors.textDim, size: 11),
+                        const SizedBox(width: 4),
+                        Text(fmtDate(p['date']),
+                            style: const TextStyle(
+                                color: AppColors.textDim, fontSize: 11)),
+                      ]),
+                    ]),
+              ),
+              const SizedBox(width: 8),
+              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                const Text('RATING',
+                    style: TextStyle(
+                        color: AppColors.textDim,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6)),
+                Text('$rating',
+                    style: const TextStyle(
+                        color: AppColors.gold,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900)),
+              ]),
+            ]),
+          );
+        }),
       ],
     );
   }

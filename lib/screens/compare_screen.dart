@@ -155,19 +155,27 @@ class _CompareScreenState extends State<CompareScreen> {
   }
 
   Widget _row(String label, String va, String vb) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.surfaceAlt),
+      ),
       child: Row(children: [
         Expanded(
           child: Text(va, textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.gold, fontWeight: FontWeight.w800)),
+              style: const TextStyle(color: AppColors.gold,
+                  fontWeight: FontWeight.w800, fontSize: 14)),
         ),
         SizedBox(width: 110,
             child: Text(label, textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textDim, fontSize: 12))),
+                style: const TextStyle(color: AppColors.textDim, fontSize: 11.5))),
         Expanded(
           child: Text(vb, textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.w800)),
+              style: const TextStyle(color: AppColors.cyan,
+                  fontWeight: FontWeight.w800, fontSize: 14)),
         ),
       ]),
     );

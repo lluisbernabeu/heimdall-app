@@ -75,31 +75,70 @@ class _SectorCard extends StatelessWidget {
         gap == null ? AppColors.textDim : (gap <= 0 ? AppColors.green : AppColors.red);
     String gapStr(num? gap) =>
         gap == null ? '—' : (gap <= 0 ? '±0' : '+${(gap / 1000).toStringAsFixed(3)}s');
+    final g1 = (m['gap_s1_ms'] as num?)?.toDouble();
+    final g2 = (m['gap_s2_ms'] as num?)?.toDouble();
+    final g3 = (m['gap_s3_ms'] as num?)?.toDouble();
+    final totalGap = [g1, g2, g3].whereType<double>().fold<double>(0, (a, b) => a + b);
+    // Color dominante de la tarjeta según el mayor gap
+    final worst = [g1 ?? 0, g2 ?? 0, g3 ?? 0].reduce((a, b) => a > b ? a : b);
+    final Color accent = worst > 0 ? AppColors.red : AppColors.green;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.surfaceAlt),
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.10), AppColors.surface],
+          stops: const [0.0, 0.6],
+        ),
+        border: Border.all(color: accent.withValues(alpha: worst > 0 ? 0.35 : 0.2)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(
             child: Text('${m['track_name']}',
-                style: const TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
+                style: const TextStyle(color: AppColors.text,
+                    fontWeight: FontWeight.w800, fontSize: 14.5)),
           ),
-          Text('Split ${m['split']}',
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.cyan.withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.cyan.withValues(alpha: 0.4)),
+            ),
+            child: Text('Split ${m['split']}',
+                style: const TextStyle(color: AppColors.cyan, fontSize: 10,
+                    fontWeight: FontWeight.w700)),
+          ),
+        ]),
+        const SizedBox(height: 2),
+        Row(children: [
+          const Icon(Icons.calendar_today, color: AppColors.textDim, size: 11),
+          const SizedBox(width: 4),
+          Text(fmtDate(m['race_date']),
               style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
         ]),
-        Text(fmtDate(m['race_date']),
-            style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(children: [
           Expanded(child: _sectorCol('S1', m['my_s1'], m['best_s1'], gapColor(m['gap_s1_ms']), gapStr(m['gap_s1_ms']), fmt)),
           Expanded(child: _sectorCol('S2', m['my_s2'], m['best_s2'], gapColor(m['gap_s2_ms']), gapStr(m['gap_s2_ms']), fmt)),
           Expanded(child: _sectorCol('S3', m['my_s3'], m['best_s3'], gapColor(m['gap_s3_ms']), gapStr(m['gap_s3_ms']), fmt)),
         ]),
+        if (totalGap > 0) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+                'Sumando tus gaps pierdes +${(totalGap / 1000).toStringAsFixed(3)}s por vuelta vs el más rápido',
+                style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.w700)),
+          ),
+        ],
       ]),
     );
   }

@@ -89,15 +89,53 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
         ...rows.reversed.map((r) {
           final m = Map<String, dynamic>.from(r as Map);
           final std = (m['std_ms'] as num).toDouble();
-          return ListTile(
-            dense: true,
-            leading: Icon(Icons.speed, color: std <= avgStd ? AppColors.green : AppColors.gold, size: 18),
-            title: Text('${m['track_name']}', style: const TextStyle(color: AppColors.text, fontSize: 13)),
-            subtitle: Text('${fmtDate(m['race_date'])} · ${m['laps']} vueltas',
-                style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
-            trailing: Text('σ ${(std / 1000).toStringAsFixed(3)}s',
-                style: TextStyle(color: std <= avgStd ? AppColors.green : AppColors.gold,
-                    fontWeight: FontWeight.w800, fontSize: 12)),
+          final consistent = std <= avgStd;
+          final Color c = consistent ? AppColors.green : AppColors.gold;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: c.withValues(alpha: 0.3)),
+            ),
+            child: Row(children: [
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: c.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.speed, color: c, size: 19),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${m['track_name']}',
+                          style: const TextStyle(
+                              color: AppColors.text,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text('${fmtDate(m['race_date'])} · ${m['laps']} vueltas',
+                          style: const TextStyle(
+                              color: AppColors.textDim, fontSize: 11)),
+                    ]),
+              ),
+              const SizedBox(width: 8),
+              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Text('σ ${(std / 1000).toStringAsFixed(3)}s',
+                    style: TextStyle(color: c,
+                        fontWeight: FontWeight.w900, fontSize: 13)),
+                Text(consistent ? 'Consistente' : 'Irregular',
+                    style: TextStyle(color: AppColors.textDim, fontSize: 9)),
+              ]),
+            ]),
           );
         }),
       ],

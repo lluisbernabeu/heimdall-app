@@ -362,11 +362,18 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               if (race['car_logo'] != null) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                Container(
+                  width: 44, height: 44,
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceAlt.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.surfaceAlt),
+                  ),
                   child: Image.network(race['car_logo'] as String,
-                      width: 30, height: 30, fit: BoxFit.contain,
-                      errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => Icon(Icons.directions_car,
+                          color: AppColors.textDim, size: 22)),
                 ),
                 const SizedBox(width: 10),
               ],

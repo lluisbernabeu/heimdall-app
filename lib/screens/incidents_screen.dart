@@ -47,6 +47,25 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
     final maxCount = byMinute.values.fold<int>(0,
         (a, b) => (b as num).toInt() > a ? b.toInt() : a);
 
+    String typeLabel(String code) {
+      switch (code) {
+        case 'C': return 'Cut ✂️';
+        case 'D': return 'Contacto 💥';
+        case 'O': return 'Fuera 🚧';
+        case 'R': return 'Relaunch 🔁';
+        default: return code;
+      }
+    }
+
+    Color typeColor(String code) {
+      switch (code) {
+        case 'D': return AppColors.red;
+        case 'C': return AppColors.gold;
+        case 'O': return AppColors.cyan;
+        default: return AppColors.textDim;
+      }
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -121,16 +140,16 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: typeColor(e.key).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.surfaceAlt),
+                border: Border.all(color: typeColor(e.key).withValues(alpha: 0.45)),
               ),
-              child: Text('${e.key}: ${e.value}',
-                  style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.w700)),
+              child: Text('${typeLabel(e.key)}: ${e.value}',
+                  style: TextStyle(color: typeColor(e.key), fontWeight: FontWeight.w700)),
             ),
         ]),
         const SizedBox(height: 12),
-        const Text('Tipos: C=contacto · O=fuera de pista · R=colisión por detrás · S=cut de chicane',
+        const Text('Tipos: C=cut (la vuelta no cuenta) · D=contacto/daño · O=fuera de pista · R=relaunch (reinicio del servidor)',
             style: TextStyle(color: AppColors.textDim, fontSize: 11)),
       ],
     );
