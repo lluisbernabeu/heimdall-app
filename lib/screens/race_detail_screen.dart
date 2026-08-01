@@ -365,8 +365,8 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
             Row(children: [
               if (race['car_logo'] != null) ...[
                 Container(
-                  width: 44, height: 44,
-                  padding: const EdgeInsets.all(6),
+                  width: 56, height: 56,
+                  padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceAlt.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(12),
@@ -375,7 +375,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
                   child: Image.network(race['car_logo'] as String,
                       fit: BoxFit.contain,
                       errorBuilder: (_, _, _) => Icon(Icons.directions_car,
-                          color: AppColors.textDim, size: 22)),
+                          color: AppColors.textDim, size: 28)),
                 ),
                 const SizedBox(width: 10),
               ],

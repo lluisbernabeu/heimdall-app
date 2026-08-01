@@ -65,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const Text('Heimdall'),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.sync, color: AppColors.cyan),
+            icon: const Icon(Icons.sync, color: AppColors.cyan, size: 28),
             tooltip: 'Sincronizar',
             onPressed: _profileId == null ? null : () async {
               try {
@@ -81,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.logout, color: AppColors.textDim),
+            icon: const Icon(Icons.logout, color: AppColors.textDim, size: 28),
             onPressed: () async {
               await ApiClient.clearToken();
               if (!context.mounted) return;
@@ -109,18 +109,18 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.insights_outlined, color: AppColors.textDim),
-            selectedIcon: Icon(Icons.insights, color: AppColors.gold),
+            icon: Icon(Icons.insights_outlined, color: AppColors.textDim, size: 28),
+            selectedIcon: Icon(Icons.insights, color: AppColors.gold, size: 30),
             label: 'Resumen',
           ),
           NavigationDestination(
-            icon: Icon(Icons.analytics_outlined, color: AppColors.textDim),
-            selectedIcon: Icon(Icons.analytics, color: AppColors.gold),
+            icon: Icon(Icons.analytics_outlined, color: AppColors.textDim, size: 28),
+            selectedIcon: Icon(Icons.analytics, color: AppColors.gold, size: 30),
             label: 'Análisis',
           ),
           NavigationDestination(
-            icon: Icon(Icons.flag_outlined, color: AppColors.textDim),
-            selectedIcon: Icon(Icons.flag, color: AppColors.gold),
+            icon: Icon(Icons.flag_outlined, color: AppColors.textDim, size: 28),
+            selectedIcon: Icon(Icons.flag, color: AppColors.gold, size: 30),
             label: 'Carreras',
           ),
         ],
