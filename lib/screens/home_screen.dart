@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
+import '../widgets/race_card.dart';
 import 'loading_screen.dart';
 import 'race_detail_screen.dart';
 
@@ -524,7 +525,7 @@ class _RacesTabState extends State<_RacesTab> {
       child: ListView.builder(
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         itemCount: races.length,
-        itemBuilder: (context, i) => _RaceTile(
+        itemBuilder: (context, i) => RaceCard(
           r: races[i],
           onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => RaceDetailScreen(
@@ -605,86 +606,6 @@ class _ActionRow extends StatelessWidget {
             ]),
           ),
           const Icon(Icons.chevron_right, color: AppColors.textDim, size: 20),
-        ]),
-      ),
-    );
-  }
-}
-
-class _RaceTile extends StatelessWidget {
-  final Map<String, dynamic> r; final VoidCallback onTap;
-  const _RaceTile({required this.r, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    final pos = r['finish_pos'];
-    final Color posColor = pos == 1 ? AppColors.gold : pos <= 3 ? AppColors.cyan : AppColors.text;
-    final rc = (r['rating_change'] as num?)?.toDouble();
-    final sc = (r['sr_change'] as num?)?.toDouble();
-    final bow = r['best_of_week'] == true;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.surfaceAlt),
-        ),
-        child: Row(children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
-                colors: [posColor.withValues(alpha: 0.28), posColor.withValues(alpha: 0.10)],
-              ),
-              shape: BoxShape.circle,
-              border: Border.all(color: posColor.withValues(alpha: 0.5), width: 1.2),
-            ),
-            alignment: Alignment.center,
-            child: Text('$pos',
-                style: TextStyle(color: posColor, fontSize: 17, fontWeight: FontWeight.w900)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                if (r['car_logo'] != null) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.network(r['car_logo'] as String,
-                        width: 20, height: 20, fit: BoxFit.contain,
-                        errorBuilder: (_, _, _) => const SizedBox.shrink()),
-                  ),
-                  const SizedBox(width: 6),
-                ],
-                Flexible(
-                  child: Text(r['track_name']?.toString() ?? '',
-                      style: const TextStyle(color: AppColors.text, fontSize: 14,
-                          fontWeight: FontWeight.w700),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-                if (bow) ...[
-                  const SizedBox(width: 6),
-                  const Icon(Icons.star, color: AppColors.gold, size: 14),
-                ],
-              ]),
-              Text('${r['event_name']} · ${fmtDate(r['race_date'])}',
-                  style: const TextStyle(color: AppColors.textDim, fontSize: 11),
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
-            ]),
-          ),
-          const SizedBox(width: 8),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(rc == null ? '—' : (rc > 0 ? '+${rc.toStringAsFixed(0)}' : rc.toStringAsFixed(0)),
-                style: TextStyle(color: (rc ?? 0) >= 0 ? AppColors.green : AppColors.red,
-                    fontSize: 13, fontWeight: FontWeight.w800)),
-            Text(sc == null ? '' : (sc > 0 ? '+${sc.toStringAsFixed(2)}' : sc.toStringAsFixed(2)),
-                style: TextStyle(color: (sc ?? 0) >= 0 ? AppColors.green : AppColors.red,
-                    fontSize: 11, fontWeight: FontWeight.w600)),
-          ]),
         ]),
       ),
     );
