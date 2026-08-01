@@ -3,7 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
 
-/// Detalle de una carrera: vueltas con sectores + delta vs el más rápido.
+/// Detalle de una carrera: QUÉ PASÓ (historia) + datos técnicos.
 class RaceDetailScreen extends StatefulWidget {
   final int profileId;
   final int raceId;
@@ -14,6 +14,7 @@ class RaceDetailScreen extends StatefulWidget {
 
 class _RaceDetailScreenState extends State<RaceDetailScreen> {
   Map<String, dynamic>? _data;
+  Map<String, dynamic>? _story;
   bool _loading = true;
   String? _error;
 
@@ -22,8 +23,15 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
 
   Future<void> _load() async {
     try {
-      final data = await ApiClient.get('/api/profile/${widget.profileId}/races/${widget.raceId}');
-      setState(() { _data = Map<String, dynamic>.from(data as Map); _loading = false; });
+      final results = await Future.wait([
+        ApiClient.get('/api/profile/${widget.profileId}/races/${widget.raceId}'),
+        ApiClient.get('/api/profile/${widget.profileId}/races/${widget.raceId}/story'),
+      ]);
+      setState(() {
+        _data = Map<String, dynamic>.from(results[0] as Map);
+        _story = Map<String, dynamic>.from(results[1] as Map);
+        _loading = false;
+      });
     } catch (e) {
       setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
     }
@@ -45,15 +53,217 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
           : _error != null
               ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.red)))
-              : _body(),
+              : DefaultTabController(
+                  length: 2,
+                  child: Column(children: [
+                    Container(
+                      color: AppColors.surface,
+                      child: const TabBar(
+                        tabs: [
+                          Tab(text: 'Qué pasó'),
+                          Tab(text: 'Datos'),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: TabBarView(children: [
+                        _storyView(),
+                        _dataView(),
+                      ]),
+                    ),
+                  ]),
+                ),
     );
   }
 
-  Widget _body() {
+  // ===================================================================
+  // PESTAÑA 1 — QUÉ PASÓ (narrativa)
+  // ===================================================================
+  Widget _storyView() {
+    final st = _story!;
+    final race = (st['race'] as Map? ?? {});
+    final summary = (st['summary'] as Map? ?? {});
+    final incidents = (st['incidents'] as List? ?? []);
+    final ahead = (st['ahead'] as List? ?? []);
+    final posEvents = (st['position_events'] as List? ?? []);
+    final gained = (summary['positions_gained'] as num?)?.toInt() ?? 0;
+    final startPos = race['start_pos'];
+    final finishPos = race['finish_pos'];
+
+    final Color verdictColor = gained >= 0 ? AppColors.green : AppColors.red;
+    final String verdictEmoji = gained >= 0 ? '📈' : '📉';
+    final String verdictText = gained == 0
+        ? 'Mantuviste tu posición'
+        : gained > 0
+            ? 'Ganaste $gained posiciones (P$startPos → P$finishPos)'
+            : 'Perdiste ${-gained} posiciones (P$startPos → P$finishPos)';
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: AppColors.gold,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Resumen narrativo
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                colors: [verdictColor.withValues(alpha: 0.20), AppColors.surface],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: verdictColor.withValues(alpha: 0.6)),
+            ),
+            child: Row(children: [
+              Text(verdictEmoji, style: const TextStyle(fontSize: 32)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${race['track_name']}',
+                      style: const TextStyle(color: AppColors.text, fontSize: 17,
+                          fontWeight: FontWeight.w800)),
+                  Text('${race['event_name']}',
+                      style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  Text(verdictText,
+                      style: TextStyle(color: verdictColor, fontSize: 14, fontWeight: FontWeight.w800)),
+                  Text('${summary['total_incidents'] ?? 0} incidentes · '
+                      '${summary['final_lap'] ?? '—'} vueltas',
+                      style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
+                ]),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 14),
+
+          // Incidentes explicados
+          if (incidents.isNotEmpty) ...[
+            const Text('Tus incidentes, explicados',
+                style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w800, fontSize: 15)),
+            const SizedBox(height: 8),
+            ...incidents.map<Widget>((raw) {
+              final i = Map<String, dynamic>.from(raw as Map);
+              final lap = i['lap'];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.red.withValues(alpha: 0.35)),
+                ),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${i['icon'] ?? '⚠️'}', style: const TextStyle(fontSize: 22)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Vuelta $lap · ${i['type_label'] ?? i['type']}',
+                          style: const TextStyle(color: AppColors.red, fontSize: 13,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 3),
+                      Text('${i['explanation'] ?? ''}',
+                          style: const TextStyle(color: AppColors.textDim, fontSize: 12, height: 1.3)),
+                    ]),
+                  ),
+                ]),
+              );
+            }),
+            const SizedBox(height: 8),
+          ],
+
+          // Cambios de posición
+          if (posEvents.isNotEmpty) ...[
+            const Text('Cómo fue tu carrera',
+                style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w800, fontSize: 15)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.surfaceAlt),
+              ),
+              child: Column(children: [
+                for (final e in posEvents.cast<Map>().take(8))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    child: Row(children: [
+                      Text('V${e['lap']}',
+                          style: const TextStyle(color: AppColors.textDim, fontSize: 12),
+                          ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          (e['delta'] as num) > 0
+                              ? '⬆️ Subiste de P${e['from_pos']} a P${e['to_pos']}'
+                              : '⬇️ Bajaste de P${e['from_pos']} a P${e['to_pos']}',
+                          style: TextStyle(
+                              color: (e['delta'] as num) > 0 ? AppColors.green : AppColors.red,
+                              fontSize: 13, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ]),
+                  ),
+              ]),
+            ),
+            const SizedBox(height: 8),
+          ],
+
+          // Qué hacen los mejores
+          if (ahead.isNotEmpty) ...[
+            const Text('¿Qué hacen los que van delante?',
+                style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w800, fontSize: 15)),
+            const SizedBox(height: 8),
+            ...ahead.map<Widget>((raw) {
+              final a = Map<String, dynamic>.from(raw as Map);
+              final tone = a['tone']?.toString() ?? 'cyan';
+              final Color c = tone == 'green' ? AppColors.green
+                  : tone == 'red' ? AppColors.red : AppColors.cyan;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: c.withValues(alpha: 0.4)),
+                ),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(tone == 'green' ? Icons.thumb_up_alt_rounded : Icons.psychology_alt_outlined,
+                      color: c, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('${a['title'] ?? ''}',
+                          style: TextStyle(color: c, fontSize: 13, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 3),
+                      Text('${a['msg'] ?? ''}',
+                          style: const TextStyle(color: AppColors.textDim, fontSize: 12, height: 1.3)),
+                    ]),
+                  ),
+                ]),
+              );
+            }),
+          ],
+
+          if (incidents.isEmpty && ahead.isEmpty && posEvents.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('Sin datos de vueltas detalladas para esta carrera.',
+                  textAlign: TextAlign.center, style: TextStyle(color: AppColors.textDim)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ===================================================================
+  // PESTAÑA 2 — DATOS (técnicos)
+  // ===================================================================
+  Widget _dataView() {
     final race = Map<String, dynamic>.from(_data!['race'] as Map);
     final pilots = (_data!['pilots'] as List? ?? []).cast<Map>();
     final lapChart = (_data!['lap_chart'] as List? ?? []).cast<Map>();
-    final incidents = (_data!['incidents'] as List? ?? []).cast<Map>();
     final myUid = _data!['my_user_id'];
     final dateStr = race['race_date']?.toString();
     final dateShort = (dateStr != null && dateStr.length >= 10) ? dateStr.substring(0, 10) : '';
@@ -73,9 +283,22 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
             border: Border.all(color: AppColors.surfaceAlt),
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${race['track_name']}',
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
-                    color: AppColors.text)),
+            Row(children: [
+              if (race['car_logo'] != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(race['car_logo'] as String,
+                      width: 30, height: 30, fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                ),
+                const SizedBox(width: 10),
+              ],
+              Expanded(
+                child: Text('${race['track_name']}',
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
+                        color: AppColors.text)),
+              ),
+            ]),
             Text('${race['event_name']} · $dateShort',
                 style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
             const SizedBox(height: 12),
@@ -167,20 +390,6 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
               }),
             ]),
           ),
-        ],
-
-        // Incidentes
-        if (incidents.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          const Text('Tus incidentes',
-              style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          ...incidents.map((i) => ListTile(
-            dense: true,
-            leading: const Icon(Icons.warning_amber, color: AppColors.red, size: 18),
-            title: Text('${i['time']} · tipo ${i['type']}',
-                style: const TextStyle(color: AppColors.text, fontSize: 13)),
-          )),
         ],
       ],
     );

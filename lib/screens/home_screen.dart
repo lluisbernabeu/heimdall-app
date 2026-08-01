@@ -336,8 +336,66 @@ class _SummaryTab extends StatelessWidget {
                 ),
               ]),
             ),
+
+          // Glosario (¿qué significa cada cosa?)
+          const SizedBox(height: 10),
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.surfaceAlt),
+            ),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+              leading: const Icon(Icons.menu_book_outlined, color: AppColors.gold),
+              title: const Text('¿Qué significa cada cosa?',
+                  style: TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w700)),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _GlossaryItem(
+                    term: 'Rating (ELO)',
+                    def: 'Tu nivel general. Sube al quedar por delante de pilotos con más rating que tú y baja al quedar por detrás de los que tienen menos. Empieza en 1500.'),
+                _GlossaryItem(
+                    term: 'SR (Safety Rating)',
+                    def: 'Tu nota de seguridad. Sube con carreras limpias (pocos incidentes) y baja con choques, salidas de pista y sanciones. Determina tu licencia.'),
+                _GlossaryItem(
+                    term: 'Incidentes',
+                    def: 'Contactos y sanciones de LFM: C = contacto, D = drive-through (sanción), O = fuera de pista. Menos es siempre mejor.'),
+                _GlossaryItem(
+                    term: 'Split',
+                    def: 'Grupo de pilotos de nivel parecido en una misma carrera. Los splits se numeran: split 1 = los más rápidos.'),
+                _GlossaryItem(
+                    term: 'Sectores S1/S2/S3',
+                    def: 'El circuito se divide en 3 tramos. Tu vuelta perfecta es la suma de tu mejor S1 + S2 + S3. Ahí se gana o se pierde el tiempo.'),
+                _GlossaryItem(
+                    term: 'SOF (Strength of Field)',
+                    def: 'El rating medio de los pilotos de tu carrera. Ganar en un SOF alto da más puntos y rating.'),
+                _GlossaryItem(
+                    term: 'Best of Week (BOW)',
+                    def: 'Tu mejor resultado de la semana según LFM. Llevas 4 ⭐ — buen ritmo cuando todo sale limpio.'),
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _GlossaryItem extends StatelessWidget {
+  final String term; final String def;
+  const _GlossaryItem({required this.term, required this.def});
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(term, style: const TextStyle(color: AppColors.gold, fontSize: 13, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 2),
+        Text(def, style: const TextStyle(color: AppColors.textDim, fontSize: 12, height: 1.35)),
+      ]),
     );
   }
 }
@@ -593,6 +651,15 @@ class _RaceTile extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
+                if (r['car_logo'] != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.network(r['car_logo'] as String,
+                        width: 20, height: 20, fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink()),
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 Flexible(
                   child: Text(r['track_name']?.toString() ?? '',
                       style: const TextStyle(color: AppColors.text, fontSize: 14,
