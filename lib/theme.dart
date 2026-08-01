@@ -10,6 +10,7 @@ class AppColors {
   static const Color cyan = Color(0xFF3DD6E8);     // cian telemetría
   static const Color red = Color(0xFFE83D4A);      // incidentes/negativo
   static const Color green = Color(0xFF3DE87A);    // positivo/SR
+  static const Color blue = Color(0xFF3D8BE8);     // resultado neutro
   static const Color text = Color(0xFFE8EEF4);
   static const Color textDim = Color(0xFF8CA0B4);
 }

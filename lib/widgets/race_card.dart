@@ -4,10 +4,55 @@ import '../theme.dart';
 /// Tarjeta de carrera — usada en home (pestaña Carreras) y pantalla Carreras.
 /// Rediseño v10: logo del coche grande, badge de posición P#, etiquetas
 /// RATING/SR y borde con color según resultado.
+/// v17: semáforo de resultado — verde (buena), roja (mala), azul (neutra) —
+/// según posiciones ganadas/perdidas, incidencias y abandono. El borde y el
+/// chip de la tarjeta usan ese color; el badge P# conserva oro/cian para podio.
 class RaceCard extends StatelessWidget {
   final Map<String, dynamic> r;
   final VoidCallback onTap;
   const RaceCard({super.key, required this.r, required this.onTap});
+
+  /// Color del semáforo según el resultado de la carrera.
+  /// 🟢 Verde: ganó >= 2 posiciones con <= 4 incidencias, o podio (<=3) con <= 6.
+  /// 🔴 Roja: DNF/DSQ/DNS, perdió >= 2 posiciones, o >= 10 incidencias.
+  /// 🔵 Azul: resto (carrera neutra).
+  Color get resultColor {
+    final gain = positionGain;
+    final inc = (r['incidents'] as num?)?.toInt() ?? 0;
+    final pos = r['finish_pos'] as num?;
+    if (r['dnf'] == true || r['dsq'] == true || r['dns'] == true) {
+      return AppColors.red;
+    }
+    if (gain <= -2 || inc >= 10) return AppColors.red;
+    if (gain >= 2 || (pos != null && pos <= 3 && inc <= 6)) {
+      return AppColors.green;
+    }
+    return AppColors.blue;
+  }
+
+  /// Posiciones netas ganadas (+ = adelantó). LFM no rellena position_gain,
+  /// se calcula de start_pos - finish_pos.
+  int get positionGain {
+    final s = r['start_pos'] as num?;
+    final f = r['finish_pos'] as num?;
+    if (s == null || f == null) return 0;
+    return s.toInt() - f.toInt();
+  }
+
+  /// Texto corto que explica el color del semáforo.
+  String get resultLabel {
+    final gain = positionGain;
+    final inc = (r['incidents'] as num?)?.toInt() ?? 0;
+    final pos = r['finish_pos'] as num?;
+    if (r['dnf'] == true) return 'DNF';
+    if (r['dsq'] == true) return 'DSQ';
+    if (r['dns'] == true) return 'DNS';
+    if (gain >= 2) return '+$gain 🏁';
+    if (gain <= -2) return '$gain 🏁';
+    if (inc >= 10) return '💥 $inc';
+    if (pos != null && pos <= 3) return 'P$pos 🏆';
+    return 'P$pos';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +68,7 @@ class RaceCard extends StatelessWidget {
     final logo = r['car_logo'] as String?;
     final rcColor = (rc ?? 0) >= 0 ? AppColors.green : AppColors.red;
     final scColor = (sc ?? 0) >= 0 ? AppColors.green : AppColors.red;
-    final podium = pos != null && pos <= 3;
+    final semaforo = resultColor;
 
     return InkWell(
       onTap: onTap,
@@ -37,13 +82,13 @@ class RaceCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              posColor.withValues(alpha: podium ? 0.16 : 0.06),
+              semaforo.withValues(alpha: 0.14),
               AppColors.surface,
             ],
             stops: const [0.0, 0.6],
           ),
           border: Border.all(
-              color: posColor.withValues(alpha: podium ? 0.45 : 0.18)),
+              color: semaforo.withValues(alpha: 0.5)),
         ),
         child: Row(children: [
           // Badge de posición P#
@@ -135,6 +180,26 @@ class RaceCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis),
                     ),
                   ]),
+                  const SizedBox(height: 5),
+                  // Chip de resultado (semáforo) — explica el color de la tarjeta
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: semaforo.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: semaforo.withValues(alpha: 0.45),
+                          width: 1),
+                    ),
+                    child: Text(
+                      resultLabel,
+                      style: TextStyle(
+                          color: semaforo,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800),
+                    ),
+                  ),
                 ]),
           ),
           const SizedBox(width: 8),
