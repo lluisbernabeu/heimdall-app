@@ -86,13 +86,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text(_error!, style: const TextStyle(color: AppColors.red, fontSize: 13)),
                   ],
                   const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _loading ? null : _submit,
-                    child: _loading
-                        ? const SizedBox(
-                            width: 22, height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0A1420)))
-                        : Text(_register ? 'Crear cuenta' : 'Entrar'),
+                  GoldButton(
+                    label: _register ? 'Crear cuenta' : 'Entrar',
+                    loading: _loading,
+                    onPressed: _submit,
                   ),
                   const SizedBox(height: 12),
                   TextButton(

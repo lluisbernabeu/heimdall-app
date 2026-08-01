@@ -40,7 +40,10 @@ ThemeData buildTheme() {
     cardTheme: CardThemeData(
       color: AppColors.surface,
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.gold.withValues(alpha: 0.10)),
+      ),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
     ),
     filledButtonTheme: FilledButtonThemeData(
@@ -65,14 +68,18 @@ ThemeData buildTheme() {
       filled: true,
       fillColor: AppColors.surfaceAlt,
       hintStyle: const TextStyle(color: AppColors.textDim),
-      prefixIconColor: AppColors.textDim,
+      prefixIconColor: AppColors.gold,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
       ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppColors.gold.withValues(alpha: 0.15)),
+      ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.gold, width: 1.8),
       ),
     ),
     tabBarTheme: const TabBarThemeData(
@@ -84,7 +91,62 @@ ThemeData buildTheme() {
   );
 }
 
-/// Logo del cuerno de Heimdall (Gjallarhorn) — widget reutilizable.
+/// Botón principal con degradado dorado (marca Heimdall).
+class GoldButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+  final IconData? icon;
+  const GoldButton({super.key, required this.label, this.onPressed,
+      this.loading = false, this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: (loading || onPressed == null) ? null : onPressed,
+      child: Ink(
+        height: 52,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFF5C469), Color(0xFFE8A33D), Color(0xFFD08F28)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.gold.withValues(alpha: 0.35),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Center(
+          child: loading
+              ? const SizedBox(
+                  width: 22, height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0A1420)))
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (icon != null) ...[
+                      Icon(icon, color: const Color(0xFF0A1420), size: 20),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(label,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w800,
+                            color: Color(0xFF0A1420))),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Logo de Heimdall — bandera a cuadros dorada en marco redondeado (reutilizable).
 class HeimdallLogo extends StatelessWidget {
   final double size;
   const HeimdallLogo({super.key, this.size = 64});
@@ -95,27 +157,27 @@ class HeimdallLogo extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(size * 0.22),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Color(0xFF1A2C44), Color(0xFF0D1B2E)],
         ),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.35), width: 1.5),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.45), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.30),
-            blurRadius: 24,
-            spreadRadius: 2,
+            color: AppColors.gold.withValues(alpha: 0.25),
+            blurRadius: 22,
+            spreadRadius: 1,
           ),
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(size * 0.16),
+        padding: EdgeInsets.all(size * 0.13),
         child: Image.asset(
           'assets/images/horn.png',
           fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => Icon(Icons.rowing, color: AppColors.gold, size: size * 0.5),
+          errorBuilder: (_, _, _) => Icon(Icons.flag, color: AppColors.gold, size: size * 0.5),
         ),
       ),
     );
