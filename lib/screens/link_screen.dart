@@ -69,12 +69,11 @@ class _LinkScreenState extends State<LinkScreen> {
               Text(_error!, style: const TextStyle(color: AppColors.red, fontSize: 13)),
             ],
             const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _loading ? null : _link,
-              child: _loading
-                  ? const SizedBox(width: 22, height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0A1420)))
-                  : const Text('Conectar y descargar mis carreras'),
+            GoldButton(
+              label: 'Conectar y descargar mis carreras',
+              icon: Icons.download,
+              loading: _loading,
+              onPressed: _link,
             ),
             const SizedBox(height: 12),
             TextButton(

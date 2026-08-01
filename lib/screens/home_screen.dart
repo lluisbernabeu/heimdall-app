@@ -363,7 +363,7 @@ class _SummaryTab extends StatelessWidget {
                     def: 'Tu nota de seguridad. Sube con carreras limpias (pocos incidentes) y baja con choques, salidas de pista y sanciones. Determina tu licencia.'),
                 _GlossaryItem(
                     term: 'Incidentes',
-                    def: 'Lo que LFM registra: C = cut (cortaste la pista y la vuelta no cuenta), D = contacto/daño, O = fuera de pista. Menos es siempre mejor.'),
+                    def: 'Lo que LFM registra: C = cut (cortaste la pista y la vuelta no cuenta), D = contacto/daño, O = fuera de pista, R = relaunch (te reiniciaste en la pista). Menos es siempre mejor.'),
                 _GlossaryItem(
                     term: 'Split',
                     def: 'Grupo de pilotos de nivel parecido en una misma carrera. Los splits se numeran: split 1 = los más rápidos.'),

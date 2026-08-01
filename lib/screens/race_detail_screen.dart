@@ -92,11 +92,12 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
 
     final Color verdictColor = gained >= 0 ? AppColors.green : AppColors.red;
     final String verdictEmoji = gained >= 0 ? '📈' : '📉';
+    final String pluralPos = (gained.abs() == 1) ? 'posición' : 'posiciones';
     final String verdictText = gained == 0
         ? 'Mantuviste tu posición'
         : gained > 0
-            ? 'Ganaste $gained posiciones (P$startPos → P$finishPos)'
-            : 'Perdiste ${-gained} posiciones (P$startPos → P$finishPos)';
+            ? 'Ganaste $gained $pluralPos (P$startPos → P$finishPos)'
+            : 'Perdiste ${-gained} $pluralPos (P$startPos → P$finishPos)';
 
     final laps = (st['laps'] as List? ?? []).cast<Map>();
     // mejor vuelta válida para mostrar el gap de cada vuelta
@@ -138,8 +139,9 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
                   const SizedBox(height: 8),
                   Text(verdictText,
                       style: TextStyle(color: verdictColor, fontSize: 14, fontWeight: FontWeight.w800)),
-                  Text('${summary['total_incidents'] ?? 0} incidentes · '
-                      '${summary['final_lap'] ?? '—'} vueltas',
+                  Text(
+                      '${summary['total_incidents'] ?? 0} ${(summary['total_incidents'] ?? 0) == 1 ? 'incidente' : 'incidentes'} · '
+                      '${summary['final_lap'] ?? '—'} ${(summary['final_lap'] ?? 0) == 1 ? 'vuelta' : 'vueltas'}',
                       style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
                 ]),
               ),
@@ -406,26 +408,77 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
         const Text('Ranking del split (mejor vuelta)',
             style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
-        ...pilots.take(10).map((p) => ListTile(
-          dense: true,
-          leading: CircleAvatar(
-            radius: 14,
-            backgroundColor: p['user_id'] == myUid
-                ? AppColors.gold.withValues(alpha: 0.25)
-                : AppColors.surfaceAlt,
-            child: Text('${p['user_id'] == myUid ? '★' : (pilots.indexOf(p) + 1)}',
-                style: TextStyle(color: p['user_id'] == myUid
-                    ? AppColors.gold : AppColors.textDim, fontSize: 11,
-                    fontWeight: FontWeight.w800)),
-          ),
-          title: Text('${p['name']}',
-              style: TextStyle(color: p['user_id'] == myUid
-                  ? AppColors.gold : AppColors.text, fontSize: 13,
-                  fontWeight: p['user_id'] == myUid ? FontWeight.w800 : FontWeight.w400)),
-          trailing: Text(_fmt(p['best_lap_ms']),
-              style: const TextStyle(color: AppColors.cyan, fontSize: 12,
-                  fontWeight: FontWeight.w700)),
-        )),
+        ...pilots.take(10).toList().asMap().entries.map((e) {
+          final i = e.key;
+          final p = e.value;
+          final isMe = p['user_id'] == myUid;
+          final leaderMs = (pilots.isNotEmpty && pilots.first['best_lap_ms'] != null)
+              ? (pilots.first['best_lap_ms'] as num).toDouble()
+              : null;
+          final myMs = (p['best_lap_ms'] as num?)?.toDouble();
+          final gapMs = (myMs != null && leaderMs != null) ? myMs - leaderMs : null;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isMe ? AppColors.gold : AppColors.surfaceAlt,
+                width: isMe ? 1.5 : 1,
+              ),
+            ),
+            child: Row(children: [
+              // Posición
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isMe
+                      ? AppColors.gold.withValues(alpha: 0.18)
+                      : (i == 0 ? AppColors.gold.withValues(alpha: 0.12) : AppColors.surfaceAlt),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  isMe ? '★' : '${i + 1}',
+                  style: TextStyle(
+                    color: isMe ? AppColors.gold : (i == 0 ? AppColors.gold : AppColors.textDim),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Nombre + nº vueltas
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${p['name']}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isMe ? AppColors.gold : AppColors.text,
+                        fontSize: 13,
+                        fontWeight: isMe ? FontWeight.w800 : FontWeight.w600,
+                      )),
+                  const SizedBox(height: 2),
+                  Text('${p['laps']} vueltas · media ${_fmt(p['avg_lap_ms'])}',
+                      style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              // Tiempo + gap
+              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Text(_fmt(p['best_lap_ms']),
+                    style: const TextStyle(color: AppColors.cyan, fontSize: 13,
+                        fontWeight: FontWeight.w700)),
+                if (gapMs != null && gapMs > 0)
+                  Text('+${_fmt(gapMs)}',
+                      style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+              ]),
+            ]),
+          );
+        }),
 
         // Gráfico de vueltas con gap
         if (lapChart.isNotEmpty) ...[
