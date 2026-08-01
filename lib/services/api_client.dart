@@ -72,4 +72,7 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
-class AuthExpiredException implements Exception {}
+class AuthExpiredException implements Exception {
+  @override
+  String toString() => 'Sesión expirada. Inicia sesión de nuevo.';
+}
