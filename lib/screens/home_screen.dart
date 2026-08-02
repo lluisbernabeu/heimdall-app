@@ -98,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   index: _tab,
                   children: [
                     _SummaryTab(data: _data!, insight: _insight, onRefresh: _load),
-                    _AnalysisTab(data: _data!, onPush: _push),
+                    _AnalysisTab(data: _data!, insight: _insight, onPush: _push),
                     _RacesTab(profileId: _profileId!),
                   ],
                 ),
@@ -402,39 +402,105 @@ class _GlossaryItem extends StatelessWidget {
 }
 
 // =====================================================================
-// PESTAÑA 2 — ANÁLISIS: herramientas
+// PESTAÑA 2 — ANÁLISIS: diagnóstico + herramientas
 // =====================================================================
 class _AnalysisTab extends StatelessWidget {
   final Map<String, dynamic> data;
+  final Map<String, dynamic>? insight;
   final void Function(String) onPush;
-  const _AnalysisTab({required this.data, required this.onPush});
+  const _AnalysisTab({required this.data, required this.insight, required this.onPush});
+
+  Color _toneColor(String tone) {
+    switch (tone) {
+      case 'red': return AppColors.red;
+      case 'orange': return AppColors.gold;
+      case 'green': return AppColors.green;
+      default: return AppColors.cyan;
+    }
+  }
+
+  IconData _toneIcon(String icon) {
+    switch (icon) {
+      case 'warning': return Icons.warning_amber_rounded;
+      case 'sector': return Icons.timer_outlined;
+      case 'trophy': return Icons.emoji_events_outlined;
+      case 'shield': return Icons.verified_user_outlined;
+      default: return Icons.lightbulb_outline;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = (data['stats'] as Map? ?? {});
+    final insights = (insight?['insights'] as List? ?? []);
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('Herramientas de análisis',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.text)),
+        // ---- Diagnóstico: la señal más importante primero ----
+        const Text('Diagnóstico',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.text)),
         const SizedBox(height: 4),
-        const Text('Métricas en detalle: ritmo, consistencia y seguridad.',
+        const Text('Esto es lo que más te está costando ahora mismo.',
             style: TextStyle(color: AppColors.textDim, fontSize: 12)),
-        const SizedBox(height: 14),
-        _ActionRow(icon: Icons.show_chart, label: 'Progresión',
-            sub: 'Evolución de tu rating y SR carrera a carrera',
-            onTap: () => onPush('/analysis/progression')),
+        const SizedBox(height: 12),
+        if (insights.isNotEmpty) ...[
+          _PriorityCard(
+            icon: _toneIcon((insights.first as Map)['icon']?.toString() ?? ''),
+            color: _toneColor((insights.first as Map)['tone']?.toString() ?? 'cyan'),
+            title: (insights.first as Map)['title']?.toString() ?? '',
+            msg: (insights.first as Map)['msg']?.toString() ?? '',
+          ),
+          if (insights.length > 1) ...[
+            const SizedBox(height: 10),
+            ...insights.skip(1).map<Widget>((raw) {
+              final i = Map<String, dynamic>.from(raw as Map);
+              final c = _toneColor(i['tone']?.toString() ?? 'cyan');
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: c.withValues(alpha: 0.3)),
+                ),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(_toneIcon(i['icon']?.toString() ?? ''), color: c, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(i['title']?.toString() ?? '',
+                        style: TextStyle(color: c, fontSize: 12.5, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(i['msg']?.toString() ?? '',
+                        style: const TextStyle(color: AppColors.textDim, fontSize: 11.5, height: 1.35)),
+                  ])),
+                ]),
+              );
+            }),
+          ],
+          const SizedBox(height: 18),
+        ],
+        // ---- Herramientas: cada una responde una pregunta ----
+        const Text('Analizar a fondo',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.text)),
+        const SizedBox(height: 4),
+        const Text('Entra en una herramienta para ver el detalle y qué mejorar en pista.',
+            style: TextStyle(color: AppColors.textDim, fontSize: 12)),
+        const SizedBox(height: 12),
         _ActionRow(icon: Icons.timer_outlined, label: 'Sectores',
-            sub: 'Dónde ganas y pierdes tiempo en cada vuelta',
+            sub: '¿Dónde pierdes el tiempo? Tus S1/S2/S3 vs el más rápido del split',
             onTap: () => onPush('/analysis/sectors')),
         _ActionRow(icon: Icons.speed, label: 'Consistencia',
-            sub: 'Estabilidad de tus tiempos entre vueltas',
+            sub: '¿Qué tan regulares son tus vueltas? Dónde se te va la constancia',
             onTap: () => onPush('/analysis/consistency')),
         _ActionRow(icon: Icons.report, label: 'Incidentes',
-            sub: 'Cuándo y cómo pierdes la concentración',
+            sub: '¿En qué te estrellas? Cuándo y cómo pierdes el control',
             onTap: () => onPush('/analysis/incidents')),
+        _ActionRow(icon: Icons.show_chart, label: 'Progresión',
+            sub: '¿Vas a mejor o a peor? Evolución de tu rating y SR',
+            onTap: () => onPush('/analysis/progression')),
         _ActionRow(icon: Icons.compare_arrows, label: 'Comparar',
-            sub: 'Tu perfil frente a cualquier piloto del sistema',
+            sub: '¿Cómo estás frente a otros pilotos? Perfil vs perfil',
             onTap: () => onPush('/analysis/compare')),
         const SizedBox(height: 20),
         Container(
@@ -445,7 +511,7 @@ class _AnalysisTab extends StatelessWidget {
             border: Border.all(color: AppColors.surfaceAlt),
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Números rápidos',
+            const Text('Tus cifras',
                 style: TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w800)),
             const SizedBox(height: 10),
             Wrap(spacing: 8, runSpacing: 8, children: [
@@ -459,6 +525,46 @@ class _AnalysisTab extends StatelessWidget {
           ]),
         ),
       ],
+    );
+  }
+}
+
+/// Tarjeta de prioridad — la señal nº1 del diagnóstico, grande y clara.
+class _PriorityCard extends StatelessWidget {
+  final IconData icon; final Color color; final String title; final String msg;
+  const _PriorityCard({required this.icon, required this.color, required this.title, required this.msg});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: [color.withValues(alpha: 0.16), AppColors.surface],
+          stops: const [0.0, 0.65],
+        ),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 42, height: 42,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, color: color, size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('PRIORIDAD', style: TextStyle(color: AppColors.textDim, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+          const SizedBox(height: 3),
+          Text(title, style: TextStyle(color: color, fontSize: 15, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text(msg, style: const TextStyle(color: AppColors.text, fontSize: 12.5, height: 1.4)),
+        ])),
+      ]),
     );
   }
 }

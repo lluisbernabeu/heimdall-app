@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
 
-/// Análisis de sectores: tus mejores S1/S2/S3 vs el mejor de cada carrera.
+/// Análisis de sectores — responde a "¿Dónde pierdes el tiempo?".
+/// Para cada carrera: tus mejores S1/S2/S3 vs el más rápido del split,
+/// con el sector más flojo marcado, cuánto pierdes por vuelta y cuánto
+/// suma en toda la carrera.
 class SectorsScreen extends StatefulWidget {
   const SectorsScreen({super.key});
   @override
@@ -39,7 +42,7 @@ class _SectorsScreenState extends State<SectorsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sectores (S1/S2/S3)')),
+      appBar: AppBar(title: const Text('Sectores')),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
           : _error != null
@@ -51,8 +54,11 @@ class _SectorsScreenState extends State<SectorsScreen> {
                   : ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
-                        const Text('Comparativa de tus mejores sectores vs el más rápido del split',
-                            style: TextStyle(color: AppColors.textDim, fontSize: 12)),
+                        const Text('¿Dónde pierdes el tiempo?',
+                            style: TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 4),
+                        const Text('Cada tarjeta compara tu mejor S1/S2/S3 contra el más rápido del split. El sector marcado es donde más tiempo se te va por vuelta.',
+                            style: TextStyle(color: AppColors.textDim, fontSize: 12, height: 1.4)),
                         const SizedBox(height: 12),
                         ..._data!.map((e) {
                           final m = Map<String, dynamic>.from(e as Map);
@@ -71,19 +77,32 @@ class _SectorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color gapColor(num? gap) =>
-        gap == null ? AppColors.textDim : (gap <= 0 ? AppColors.green : AppColors.red);
-    String gapStr(num? gap) =>
-        gap == null ? '—' : (gap <= 0 ? '±0' : '+${(gap / 1000).toStringAsFixed(3)}s');
     final g1 = (m['gap_s1_ms'] as num?)?.toDouble();
     final g2 = (m['gap_s2_ms'] as num?)?.toDouble();
     final g3 = (m['gap_s3_ms'] as num?)?.toDouble();
     final totalGap = [g1, g2, g3].whereType<double>().fold<double>(0, (a, b) => a + b);
-    // Color dominante de la tarjeta según el mayor gap
-    final worst = [g1 ?? 0, g2 ?? 0, g3 ?? 0].reduce((a, b) => a > b ? a : b);
-    final Color accent = worst > 0 ? AppColors.red : AppColors.green;
+    final laps = (m['laps'] as num?)?.toInt() ?? 0;
+    final totalLost = totalGap * laps; // pérdida total si mantienes el ritmo toda la carrera
+    // sector más flojo (mayor gap)
+    final sectors = [
+      ('S1', g1, m['my_s1'], m['best_s1']),
+      ('S2', g2, m['my_s2'], m['best_s2']),
+      ('S3', g3, m['my_s3'], m['best_s3']),
+    ];
+    final withGap = sectors.where((s) => s.$2 != null).toList()
+      ..sort((a, b) => (b.$2 ?? 0).compareTo(a.$2 ?? 0));
+    final worst = withGap.isNotEmpty ? withGap.first : null;
+    final best = withGap.isNotEmpty ? withGap.last : null;
+
+    Color gapColor(num? gap) =>
+        gap == null ? AppColors.textDim : (gap <= 0 ? AppColors.green : AppColors.red);
+    String gapStr(num? gap) =>
+        gap == null ? '—' : (gap <= 0 ? '±0' : '+${(gap / 1000).toStringAsFixed(3)}s');
+
+    final Color accent = (worst?.$2 ?? 0) > 0 ? AppColors.red : AppColors.green;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -92,7 +111,7 @@ class _SectorCard extends StatelessWidget {
           colors: [accent.withValues(alpha: 0.10), AppColors.surface],
           stops: const [0.0, 0.6],
         ),
-        border: Border.all(color: accent.withValues(alpha: worst > 0 ? 0.35 : 0.2)),
+        border: Border.all(color: accent.withValues(alpha: (worst?.$2 ?? 0) > 0 ? 0.4 : 0.2)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -117,35 +136,55 @@ class _SectorCard extends StatelessWidget {
         Row(children: [
           const Icon(Icons.calendar_today, color: AppColors.textDim, size: 11),
           const SizedBox(width: 4),
-          Text(fmtDate(m['race_date']),
+          Text('${fmtDate(m['race_date'])} · $laps vueltas',
               style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
         ]),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: _sectorCol('S1', m['my_s1'], m['best_s1'], gapColor(m['gap_s1_ms']), gapStr(m['gap_s1_ms']), fmt)),
-          Expanded(child: _sectorCol('S2', m['my_s2'], m['best_s2'], gapColor(m['gap_s2_ms']), gapStr(m['gap_s2_ms']), fmt)),
-          Expanded(child: _sectorCol('S3', m['my_s3'], m['best_s3'], gapColor(m['gap_s3_ms']), gapStr(m['gap_s3_ms']), fmt)),
+          for (final s in sectors)
+            Expanded(child: _sectorCol(
+                s.$1, s.$3, s.$4,
+                gapColor(s.$2), gapStr(s.$2),
+                fmt, s.$1 == worst?.$1 && (worst?.$2 ?? 0) > 0)),
         ]),
         if (totalGap > 0) ...[
           const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(
-                'Sumando tus gaps pierdes +${(totalGap / 1000).toStringAsFixed(3)}s por vuelta vs el más rápido',
-                style: TextStyle(color: accent, fontSize: 11, fontWeight: FontWeight.w700)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                  'Pierdes ${(totalGap / 1000).toStringAsFixed(3)}s por vuelta vs el más rápido',
+                  style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w800)),
+              if (laps > 1 && totalLost > 0)
+                Text(
+                    'En una carrera de $laps vueltas son ~${(totalLost / 1000).toStringAsFixed(1)}s de diferencia. ${worst != null ? 'Empieza por ${worst.$1}: es tu mayor pérdida (${(worst.$2! / 1000).toStringAsFixed(3)}s).' : ''}',
+                    style: const TextStyle(color: AppColors.textDim, fontSize: 11, height: 1.4)),
+            ]),
           ),
-        ],
+        ] else if (best != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text('Igualas al más rápido en todos los sectores — ritmo top. 🏁',
+                style: const TextStyle(color: AppColors.green, fontSize: 11.5, fontWeight: FontWeight.w700)),
+          ),
       ]),
     );
   }
 
-  Widget _sectorCol(String label, String? mine, String? best, Color gapColor, String gapStr, String Function(num?) fmt) {
+  Widget _sectorCol(String label, String? mine, String? best, Color gapColor, String gapStr,
+      String Function(num?) fmt, bool isWorst) {
     return Column(children: [
-      Text(label, style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.w800, fontSize: 12)),
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Text(label, style: const TextStyle(color: AppColors.cyan, fontWeight: FontWeight.w800, fontSize: 12)),
+        if (isWorst) ...[
+          const SizedBox(width: 4),
+          const Icon(Icons.priority_high, color: AppColors.red, size: 12),
+        ],
+      ]),
       const SizedBox(height: 4),
       Text(mine ?? '—', style: const TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w700)),
       Text('top ${best ?? '—'}', style: const TextStyle(color: AppColors.textDim, fontSize: 10)),

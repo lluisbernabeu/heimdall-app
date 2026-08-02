@@ -3,7 +3,10 @@ import 'package:fl_chart/fl_chart.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
 
-/// Consistencia: desviación estándar de tiempos por carrera.
+/// Consistencia — responde a "¿Qué tan regulares son tus vueltas?".
+/// Explica la desviación estándar en cristiano: es cuánto varían tus
+/// tiempos entre vueltas. Menor = más constante. Muestra también el
+/// spread (mejor vs peor vuelta) para ver la vuelta que rompió la racha.
 class ConsistencyScreen extends StatefulWidget {
   const ConsistencyScreen({super.key});
   @override
@@ -29,6 +32,21 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
     }
   }
 
+  String _fmt(num? ms) {
+    if (ms == null) return '—';
+    final total = ms.round();
+    final m = total ~/ 60000;
+    final s = (total % 60000) / 1000.0;
+    return '$m:${s.toStringAsFixed(3).padLeft(6, '0')}';
+  }
+
+  /// Categoría: <1s muy consistente, <2.5s normal, >=2.5s irregular.
+  (String, Color) _verdict(double stdMs) {
+    if (stdMs < 1000) return ('Muy consistente', AppColors.green);
+    if (stdMs < 2500) return ('Normal', AppColors.cyan);
+    return ('Irregular', AppColors.gold);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -48,13 +66,20 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
     final stds = rows.map((r) => (r['std_ms'] as num).toDouble()).toList();
     final maxStd = stds.reduce((a, b) => a > b ? a : b);
     final avgStd = stds.reduce((a, b) => a + b) / stds.length;
+    final bestStd = stds.reduce((a, b) => a < b ? a : b);
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const Text('¿Qué tan regulares son tus vueltas?',
+            style: TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        const Text('La desviación estándar (σ) mide cuánto varían tus tiempos entre vueltas: cuanto más baja, más constante es tu ritmo.',
+            style: TextStyle(color: AppColors.textDim, fontSize: 12, height: 1.4)),
+        const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: _KpiCard(label: 'Media desv. estándar', value: '${(avgStd / 1000).toStringAsFixed(3)}s', color: AppColors.cyan)),
-          Expanded(child: _KpiCard(label: 'Mejor consistencia', value: '${(stds.reduce((a, b) => a < b ? a : b) / 1000).toStringAsFixed(3)}s', color: AppColors.green)),
+          Expanded(child: _KpiCard(label: 'Media σ', value: '${(avgStd / 1000).toStringAsFixed(3)}s', color: AppColors.cyan)),
+          Expanded(child: _KpiCard(label: 'Tu mejor racha', value: '${(bestStd / 1000).toStringAsFixed(3)}s', color: AppColors.green)),
         ]),
         const SizedBox(height: 16),
         SizedBox(height: 180,
@@ -83,58 +108,62 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
           )),
         ),
         const SizedBox(height: 8),
-        const Text('Desviación estándar por carrera (menor = más consistente)',
+        const Text('σ por carrera · verde = más constante que tu media',
             style: TextStyle(color: AppColors.textDim, fontSize: 11)),
         const SizedBox(height: 16),
         ...rows.reversed.map((r) {
           final m = Map<String, dynamic>.from(r as Map);
           final std = (m['std_ms'] as num).toDouble();
-          final consistent = std <= avgStd;
-          final Color c = consistent ? AppColors.green : AppColors.gold;
+          final (vlabel, vcolor) = _verdict(std);
+          final bestMs = (m['best_ms'] as num?)?.toDouble();
+          final worstMs = (m['worst_ms'] as num?)?.toDouble();
+          final spreadMs = (m['spread_ms'] as num?)?.toDouble();
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: c.withValues(alpha: 0.3)),
+              border: Border.all(color: vcolor.withValues(alpha: 0.35)),
             ),
-            child: Row(children: [
-              Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                  color: c.withValues(alpha: 0.13),
-                  borderRadius: BorderRadius.circular(10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: vcolor.withValues(alpha: 0.13),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(Icons.speed, color: vcolor, size: 19),
                 ),
-                alignment: Alignment.center,
-                child: Icon(Icons.speed, color: c, size: 19),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${m['track_name']}',
-                          style: const TextStyle(
-                              color: AppColors.text,
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 2),
-                      Text('${fmtDate(m['race_date'])} · ${m['laps']} vueltas',
-                          style: const TextStyle(
-                              color: AppColors.textDim, fontSize: 11)),
-                    ]),
-              ),
-              const SizedBox(width: 8),
-              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text('σ ${(std / 1000).toStringAsFixed(3)}s',
-                    style: TextStyle(color: c,
-                        fontWeight: FontWeight.w900, fontSize: 13)),
-                Text(consistent ? 'Consistente' : 'Irregular',
-                    style: TextStyle(color: AppColors.textDim, fontSize: 9)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${m['track_name']}',
+                        style: const TextStyle(color: AppColors.text,
+                            fontSize: 13.5, fontWeight: FontWeight.w700),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text('${fmtDate(m['race_date'])} · ${m['laps']} vueltas',
+                        style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+                  ]),
+                ),
+                const SizedBox(width: 8),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text('σ ${(std / 1000).toStringAsFixed(3)}s',
+                      style: TextStyle(color: vcolor, fontWeight: FontWeight.w900, fontSize: 13)),
+                  Text(vlabel, style: TextStyle(color: AppColors.textDim, fontSize: 9)),
+                ]),
               ]),
+              const SizedBox(height: 8),
+              if (bestMs != null && worstMs != null && spreadMs != null) ...[
+                Text('Mejor vuelta ${_fmt(bestMs)} · peor ${_fmt(worstMs)} · diferencia ${(spreadMs / 1000).toStringAsFixed(2)}s',
+                    style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+                if (spreadMs > 2500)
+                  Text('⚠️ La diferencia entre tu mejor y peor vuelta es grande: hay una vuelta que se te fue. Revisa qué pasó (tráfico, incidente o pérdida de concentración).',
+                      style: TextStyle(color: AppColors.gold, fontSize: 10.5, height: 1.35)),
+              ],
             ]),
           );
         }),
