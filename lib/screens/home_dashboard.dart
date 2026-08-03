@@ -5,12 +5,11 @@ import '../services/api_client.dart';
 import '../theme.dart';
 import 'race_detail_screen.dart';
 
-/// INICIO — dashboard con datos vivos del piloto.
+/// INICIO — tablero de KPIs del piloto.
 ///
-/// Nada de índices: la home es CONTENIDO. Tu veredicto del día, la próxima
-/// carrera con cuenta atrás, tus números con evolución, y cada tarjeta es
-/// una puerta a la herramienta que la explica. Tocas tu S1 flojo y entras
-/// en Sectores — sin buscar en ningún menú.
+/// Cada tarjeta es una métrica grande y clara (mejor vuelta, mejor posición,
+/// incidentes, mejor sector…) y al tocarla te lleva a la pantalla que la
+/// explica. La home ES el dato; la navegación nace del contenido.
 class HomeDashboardScreen extends StatefulWidget {
   final int profileId;
   final Map<String, dynamic> data; // /overview
@@ -31,6 +30,7 @@ class HomeDashboardScreen extends StatefulWidget {
 class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   List<Map<String, dynamic>> _nextRaces = [];
   List<Map<String, dynamic>> _progression = [];
+  List<Map<String, dynamic>> _sectors = [];
   Map<String, dynamic>? _percentile;
   bool _loading = true;
   Timer? _timer;
@@ -59,10 +59,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         ApiClient.get('/api/schedule?profile_id=$pid'),
         ApiClient.get('/api/profile/$pid/progression'),
         ApiClient.get('/api/global/sr-percentile/$pid'),
+        ApiClient.get('/api/profile/$pid/sectors'),
       ]);
       if (!mounted) return;
       final schedule = (results[0] as Map)['series'] as List? ?? [];
       final prog = results[1] as List;
+      final sectors = results[3] as List;
       setState(() {
         _nextRaces = [
           for (final s in schedule)
@@ -79,6 +81,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           return (a['next_race_ms'] as num).compareTo(b['next_race_ms'] as num);
         });
         _progression = [for (final p in prog) Map<String, dynamic>.from(p as Map)];
+        _sectors = [for (final s in sectors) Map<String, dynamic>.from(s as Map)];
         _percentile = Map<String, dynamic>.from(results[2] as Map);
         _loading = false;
       });
@@ -96,7 +99,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   Widget build(BuildContext context) {
     final p = Map<String, dynamic>.from(widget.data['profile'] as Map? ?? {});
     final s = Map<String, dynamic>.from(widget.data['stats'] as Map? ?? {});
-    final verdict = (widget.insight?['verdict'] as Map? ?? {});
     final insights = (widget.insight?['insights'] as List? ?? []);
     final lastRaces = (widget.data['last_races'] as List? ?? []);
     final name = (widget.insight?['profile_name']?.toString() ?? 'Piloto');
@@ -112,12 +114,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           _buildHeader(p, s, name, lic, div),
           const SizedBox(height: 12),
 
-          // ---- Veredicto del día (contenido real, no enlaces) ----
-          if (verdict.isNotEmpty)
-            _VerdictCard(verdict: Map<String, dynamic>.from(verdict)),
-          const SizedBox(height: 12),
-
-          // ---- Próxima carrera con cuenta atrás ----
+          // ---- Próxima carrera (KPI rey, con cuenta atrás) ----
           if (!_loading && _nextRaceAt != null)
             _NextRaceCard(
               race: _nextRaces.first,
@@ -127,18 +124,25 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           else if (!_loading)
             const _NoRaceCard(),
 
-          // ---- Tus números vivos ----
+          const SizedBox(height: 16),
+
+          // ---- Tablero de KPIs: cada métrica es una puerta ----
           const _SectionTitle('Tus números'),
           const SizedBox(height: 4),
-          const Text('Toca cada cifra para ver su historia.',
+          const Text('Toca cualquier métrica para ver su historia.',
               style: TextStyle(color: AppColors.textDim, fontSize: 11.5)),
           const SizedBox(height: 10),
-          _NumbersGrid(
+          _KpiBoard(
             stats: s,
             profile: p,
             progression: _progression,
+            sectors: _sectors,
             percentile: _percentile,
             onProgression: () => _push('/analysis/progression'),
+            onCircuit: () => _push('/analysis/circuit'),
+            onSectors: () => _push('/analysis/sectors'),
+            onIncidents: () => _push('/analysis/incidents'),
+            onStandings: () => _push('/profile/standings'),
             onRaces: () => widget.onGoToTab(2),
           ),
 
@@ -275,53 +279,6 @@ class _SectionTitle extends StatelessWidget {
 }
 
 // =====================================================================
-// Veredicto del día
-// =====================================================================
-class _VerdictCard extends StatelessWidget {
-  final Map<String, dynamic> verdict;
-  const _VerdictCard({required this.verdict});
-
-  Color _tone(String t) {
-    switch (t) {
-      case 'red': return AppColors.red;
-      case 'green': return AppColors.green;
-      case 'orange': return AppColors.gold;
-      default: return AppColors.cyan;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = _tone(verdict['tone']?.toString() ?? 'cyan');
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-          colors: [c.withValues(alpha: 0.16), AppColors.surface],
-          stops: const [0.0, 0.7],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: c.withValues(alpha: 0.5)),
-      ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${verdict['emoji'] ?? '📊'}', style: const TextStyle(fontSize: 32)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${verdict['title'] ?? ''}',
-                style: TextStyle(color: c, fontSize: 18, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 4),
-            Text('${verdict['msg'] ?? ''}',
-                style: const TextStyle(color: AppColors.text, fontSize: 13, height: 1.4)),
-          ]),
-        ),
-      ]),
-    );
-  }
-}
-
-// =====================================================================
 // Próxima carrera con cuenta atrás
 // =====================================================================
 class _NextRaceCard extends StatelessWidget {
@@ -445,43 +402,66 @@ class _NoRaceCard extends StatelessWidget {
       child: Row(children: [
         const Icon(Icons.event_busy_rounded, color: AppColors.textDim, size: 26),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Text('No hay próximas carreras publicadas aún.',
-              style: TextStyle(color: AppColors.textDim, fontSize: 13)),
+              style: const TextStyle(color: AppColors.textDim, fontSize: 13)),
         ),
-        TextButton(onPressed: () {}, child: const Text('Calendario')),
+        TextButton(
+            onPressed: () {}, // reemplazado por navegación externa
+            child: const Text('Calendario')),
       ]),
     );
   }
 }
 
 // =====================================================================
-// Números vivos (grid 2x2 con sparklines)
+// TABLERO DE KPIs — 8 métricas, cada una navega a su pantalla
 // =====================================================================
-class _NumbersGrid extends StatelessWidget {
+class _KpiBoard extends StatelessWidget {
   final Map<String, dynamic> stats;
   final Map<String, dynamic> profile;
   final List<Map<String, dynamic>> progression;
+  final List<Map<String, dynamic>> sectors;
   final Map<String, dynamic>? percentile;
   final VoidCallback onProgression;
+  final VoidCallback onCircuit;
+  final VoidCallback onSectors;
+  final VoidCallback onIncidents;
+  final VoidCallback onStandings;
   final VoidCallback onRaces;
-  const _NumbersGrid({
+  const _KpiBoard({
     required this.stats, required this.profile, required this.progression,
-    required this.percentile, required this.onProgression, required this.onRaces,
+    required this.sectors, required this.percentile,
+    required this.onProgression, required this.onCircuit, required this.onSectors,
+    required this.onIncidents, required this.onStandings, required this.onRaces,
   });
 
-  List<FlSpot> _ratingSeries() {
+  List<FlSpot> _series(String key) {
     return [
       for (var i = 0; i < progression.length; i++)
-        FlSpot(i.toDouble(), (progression[i]['rating'] as num).toDouble()),
+        FlSpot(i.toDouble(), (progression[i][key] as num).toDouble()),
     ];
   }
 
-  List<FlSpot> _srSeries() {
-    return [
-      for (var i = 0; i < progression.length; i++)
-        FlSpot(i.toDouble(), (progression[i]['sr'] as num).toDouble()),
-    ];
+  /// El sector más fuerte de la última carrera analizada (menor gap).
+  (String, String, Color)? _bestSector() {
+    if (sectors.isEmpty) return null;
+    final r = sectors.first;
+    final gaps = <String, num?>{
+      'S1': r['gap_s1_ms'] as num?,
+      'S2': r['gap_s2_ms'] as num?,
+      'S3': r['gap_s3_ms'] as num?,
+    };
+    final valid = gaps.entries.where((e) => e.value != null).toList();
+    if (valid.isEmpty) return null;
+    final best = valid.reduce((a, b) => a.value! <= b.value! ? a : b);
+    final ms = (best.value as num).toDouble();
+    final isPositive = ms < 0; // gap negativo = mejor que el récord del split
+    return (
+      '${best.key} ${isPositive ? '' : '+'}${(ms / 1000).toStringAsFixed(2)}s',
+      'vs el más rápido del split',
+      ms < 300 ? AppColors.green : AppColors.gold,
+    );
   }
 
   @override
@@ -490,29 +470,41 @@ class _NumbersGrid extends StatelessWidget {
     final st = (stats['sr_trend_5'] as num?)?.toDouble();
     final rating = profile['ac_rating'] ?? profile['c_rating'];
     final sr = profile['safety_rating'];
-    final races = stats['races'] ?? 0;
     final podiums = stats['podiums'] ?? 0;
+    final podiumRate = stats['podium_rate'];
+    final bestLap = stats['best_lap_fmt']?.toString();
+    final bestLapTrack = stats['best_lap_track']?.toString();
+    final bestFinish = stats['best_finish'];
+    final bestFinishTrack = _bestFinishTrack();
+    final avgInc = (stats['avg_incidents'] as num?)?.toDouble();
     final betterThan = (percentile?['percentile'] as Map?)?['better_than_pct'];
+    final bs = _bestSector();
 
     return Column(children: [
       Row(children: [
         Expanded(
-          child: _NumCard(
+          child: _KpiCard(
+            icon: Icons.speed_rounded,
+            iconColor: AppColors.gold,
             label: 'Rating',
             value: rating?.toString() ?? '—',
-            trend: rt,
-            spark: _ratingSeries(),
+            sub: _trendText(rt, 'pts'),
+            trendUp: rt == null ? null : rt >= 0,
+            spark: _series('rating'),
             sparkColor: rt != null && rt < 0 ? AppColors.red : AppColors.green,
             onTap: onProgression,
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: _NumCard(
+          child: _KpiCard(
+            icon: Icons.verified_user_rounded,
+            iconColor: AppColors.green,
             label: 'SR',
             value: sr?.toStringAsFixed(2) ?? '—',
-            trend: st,
-            spark: _srSeries(),
+            sub: _trendText(st, 'SR'),
+            trendUp: st == null ? null : st >= 0,
+            spark: _series('sr'),
             sparkColor: st != null && st < 0 ? AppColors.red : AppColors.green,
             onTap: onProgression,
           ),
@@ -521,38 +513,110 @@ class _NumbersGrid extends StatelessWidget {
       const SizedBox(height: 10),
       Row(children: [
         Expanded(
-          child: _NumCard(
-            label: 'Comunidad',
-            value: betterThan != null ? '${(betterThan as num).toStringAsFixed(1)}%' : '—',
-            sub: 'mejor que en SR',
-            onTap: onProgression,
+          child: _KpiCard(
+            icon: Icons.timer_rounded,
+            iconColor: AppColors.cyan,
+            label: 'Mejor vuelta',
+            value: bestLap ?? '—',
+            sub: bestLapTrack ?? 'en todas tus carreras',
+            onTap: onCircuit,
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: _NumCard(
-            label: 'Carreras',
-            value: '$races',
-            sub: '$podiums podios',
+          child: _KpiCard(
+            icon: Icons.emoji_events_rounded,
+            iconColor: AppColors.goldLight,
+            label: 'Mejor posición',
+            value: bestFinish != null ? 'P$bestFinish' : '—',
+            sub: bestFinishTrack ?? 'en carrera',
+            onTap: onRaces,
+          ),
+        ),
+      ]),
+      const SizedBox(height: 10),
+      Row(children: [
+        Expanded(
+          child: _KpiCard(
+            icon: Icons.report_rounded,
+            iconColor: avgInc != null && avgInc > 6 ? AppColors.red : AppColors.green,
+            label: 'Incidentes',
+            value: avgInc?.toStringAsFixed(1) ?? '—',
+            sub: 'de media por carrera',
+            onTap: onIncidents,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: bs == null
+              ? const SizedBox.shrink()
+              : _KpiCard(
+                  icon: Icons.timer_outlined,
+                  iconColor: bs.$3,
+                  label: 'Mejor sector',
+                  value: bs.$1,
+                  sub: bs.$2,
+                  onTap: onSectors,
+                ),
+        ),
+      ]),
+      const SizedBox(height: 10),
+      Row(children: [
+        Expanded(
+          child: _KpiCard(
+            icon: Icons.public_rounded,
+            iconColor: AppColors.cyan,
+            label: 'Comunidad',
+            value: betterThan != null ? '${(betterThan as num).toStringAsFixed(1)}%' : '—',
+            sub: 'mejor que en SR',
+            onTap: onStandings,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _KpiCard(
+            icon: Icons.flag_rounded,
+            iconColor: AppColors.gold,
+            label: 'Podios',
+            value: '$podiums',
+            sub: podiumRate != null ? '$podiumRate% de tus carreras' : 'en tus carreras',
             onTap: onRaces,
           ),
         ),
       ]),
     ]);
   }
+
+  String? _bestFinishTrack() {
+    final bf = stats['best_finish'];
+    if (bf == null) return null;
+    for (final r in progression) {
+      if (r['finish_pos'] == bf) return r['track']?.toString();
+    }
+    return null;
+  }
+
+  String _trendText(double? v, String unit) {
+    if (v == null) return 'estable';
+    final s = v >= 0 ? '+' : '';
+    return '$s${v.toStringAsFixed(v.abs() < 10 ? 2 : 0)} $unit';
+  }
 }
 
-class _NumCard extends StatelessWidget {
+class _KpiCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
   final String label;
   final String value;
   final String? sub;
-  final double? trend;
+  final bool? trendUp;
   final List<FlSpot>? spark;
   final Color? sparkColor;
   final VoidCallback onTap;
-  const _NumCard({
-    required this.label, required this.value, this.sub,
-    this.trend, this.spark, this.sparkColor, required this.onTap,
+  const _KpiCard({
+    required this.icon, required this.iconColor, required this.label,
+    required this.value, this.sub, this.trendUp, this.spark, this.sparkColor,
+    required this.onTap,
   });
 
   @override
@@ -563,7 +627,7 @@ class _NumCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          height: 118,
+          height: 132,
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
             color: AppColors.surface,
@@ -572,23 +636,29 @@ class _NumCard extends StatelessWidget {
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Text(label.toUpperCase(),
-                  style: const TextStyle(color: AppColors.textDim, fontSize: 9.5,
-                      fontWeight: FontWeight.w800, letterSpacing: 0.8)),
-              const Spacer(),
-              if (trend != null)
-                Icon(trend! >= 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                    color: trend! >= 0 ? AppColors.green : AppColors.red, size: 14),
+              Icon(icon, color: iconColor, size: 15),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(label.toUpperCase(),
+                    style: const TextStyle(color: AppColors.textDim, fontSize: 9,
+                        fontWeight: FontWeight.w800, letterSpacing: 0.7),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              ),
+              if (trendUp != null)
+                Icon(trendUp! ? Icons.arrow_upward : Icons.arrow_downward,
+                    color: trendUp! ? AppColors.green : AppColors.red, size: 14),
             ]),
             const Spacer(),
             Text(value,
-                style: const TextStyle(color: AppColors.text, fontSize: 22, fontWeight: FontWeight.w900)),
+                style: const TextStyle(color: AppColors.text, fontSize: 21, fontWeight: FontWeight.w900),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
             if (sub != null)
               Text(sub!,
-                  style: const TextStyle(color: AppColors.textDim, fontSize: 10.5)),
+                  style: const TextStyle(color: AppColors.textDim, fontSize: 10),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
             if (spark != null && spark!.length > 1)
               SizedBox(
-                height: 26,
+                height: 24,
                 child: LineChart(LineChartData(
                   minX: 0,
                   maxX: (spark!.length - 1).toDouble(),
