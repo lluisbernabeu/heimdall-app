@@ -13,6 +13,7 @@ import 'screens/circuit_screen.dart';
 import 'screens/compare_screen.dart';
 import 'screens/standings_screen.dart';
 import 'screens/achievements_screen.dart';
+import 'screens/glossary_screen.dart';
 
 void main() => runApp(const HeimdallApp());
 
@@ -41,6 +42,7 @@ class HeimdallApp extends StatelessWidget {
         '/analysis/compare': (_) => const CompareScreen(),
         '/profile/standings': (_) => const StandingsScreen(),
         '/profile/achievements': (_) => const AchievementsScreen(),
+        '/glossary': (_) => const GlossaryScreen(),
       },
     );
   }

@@ -5,9 +5,11 @@ import '../widgets/race_card.dart';
 import 'loading_screen.dart';
 import 'race_detail_screen.dart';
 import 'schedule_screen.dart';
+import 'explore_screen.dart';
 
-/// Home: 4 pestañas por importancia — Calendario (acción), Carreras
-/// (resultado), Análisis (mejora), Perfil (estado).
+/// Home: 5 pestañas — Explorar (mapa de todo), Calendario (acción),
+/// Carreras (resultado), Análisis (mejora), Perfil (estado).
+/// Swipe horizontal entre pestañas para navegación fluida.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -21,6 +23,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   String? _error;
   int _tab = 0;
+
+  static const List<String> _tabTitles = [
+    'Explorar', 'Calendario', 'Carreras', 'Análisis', 'Perfil',
+  ];
 
   @override
   void initState() {
@@ -64,7 +70,14 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Row(children: [
           const HeimdallLogo(size: 34),
           const SizedBox(width: 10),
-          const Text('Heimdall'),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            const Text('Heimdall'),
+            Text(
+              _tabTitles[_tab],
+              style: const TextStyle(color: AppColors.textDim, fontSize: 10.5,
+                  fontWeight: FontWeight.w600, letterSpacing: 0.4),
+            ),
+          ]),
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.sync, color: AppColors.gold, size: 32),
@@ -97,9 +110,19 @@ class _HomeScreenState extends State<HomeScreen> {
           : _error != null
               ? _ErrorView(msg: _error!, onRetry: _load)
               : RuneBackground(
+                  // Swipe horizontal entre pestañas (navegación fluida)
+                  child: GestureDetector(
+                  onHorizontalDragEnd: (details) {
+                    final v = details.primaryVelocity ?? 0;
+                    if (v.abs() < 300) return;
+                    final next = _tab + (v < 0 ? 1 : -1);
+                    if (next >= 0 && next < 5) setState(() => _tab = next);
+                  },
                   child: IndexedStack(
                   index: _tab,
                   children: [
+                    // 0. Explorar — el mapa de todo lo que ofrece la app
+                    ExploreScreen(onGoToTab: (i) => setState(() => _tab = i)),
                     // 1. Calendario — la acción: ¿cuándo corro y puedo correr?
                     ScheduleScreen(profileId: _profileId),
                     // 2. Carreras — el resultado: historial completo
@@ -109,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     // 4. Perfil — el estado: veredicto + cifras + tendencia
                     _SummaryTab(data: _data!, insight: _insight, onRefresh: _load),
                   ],
-                )),
+                ))),
       bottomNavigationBar: NavigationBar(
         backgroundColor: AppColors.surface,
         indicatorColor: AppColors.gold.withValues(alpha: 0.22),
@@ -117,23 +140,28 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.today_outlined, color: AppColors.textDim, size: 32),
-            selectedIcon: Icon(Icons.today, color: AppColors.gold, size: 34),
+            icon: Icon(Icons.explore_outlined, color: AppColors.textDim, size: 28),
+            selectedIcon: Icon(Icons.explore_rounded, color: AppColors.gold, size: 30),
+            label: 'Explorar',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.today_outlined, color: AppColors.textDim, size: 28),
+            selectedIcon: Icon(Icons.today, color: AppColors.gold, size: 30),
             label: 'Calendario',
           ),
           NavigationDestination(
-            icon: Icon(Icons.flag_outlined, color: AppColors.textDim, size: 32),
-            selectedIcon: Icon(Icons.flag, color: AppColors.gold, size: 34),
+            icon: Icon(Icons.flag_outlined, color: AppColors.textDim, size: 28),
+            selectedIcon: Icon(Icons.flag, color: AppColors.gold, size: 30),
             label: 'Carreras',
           ),
           NavigationDestination(
-            icon: Icon(Icons.analytics_outlined, color: AppColors.textDim, size: 32),
-            selectedIcon: Icon(Icons.analytics, color: AppColors.gold, size: 34),
+            icon: Icon(Icons.analytics_outlined, color: AppColors.textDim, size: 28),
+            selectedIcon: Icon(Icons.analytics, color: AppColors.gold, size: 30),
             label: 'Análisis',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline, color: AppColors.textDim, size: 32),
-            selectedIcon: Icon(Icons.person, color: AppColors.gold, size: 34),
+            icon: Icon(Icons.person_outline, color: AppColors.textDim, size: 28),
+            selectedIcon: Icon(Icons.person, color: AppColors.gold, size: 30),
             label: 'Perfil',
           ),
         ],
@@ -343,65 +371,19 @@ class _SummaryTab extends StatelessWidget {
             ]),
           ),
 
-          // Glosario (¿qué significa cada cosa?)
+          // Glosario (¿qué significa cada cosa?) — pantalla propia, 1 tap
           const SizedBox(height: 10),
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.surfaceAlt),
-            ),
-            child: ExpansionTile(
-              tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-              leading: const Icon(Icons.menu_book_outlined, color: AppColors.gold),
-              title: const Text('¿Qué significa cada cosa?',
-                  style: TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w700)),
-              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-              expandedCrossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                _GlossaryItem(
-                    term: 'Rating (ELO)',
-                    def: 'Tu nivel general. Sube al quedar por delante de pilotos con más rating que tú y baja al quedar por detrás de los que tienen menos. Empieza en 1500.'),
-                _GlossaryItem(
-                    term: 'SR (Safety Rating)',
-                    def: 'Tu nota de seguridad. Sube con carreras limpias (pocos incidentes) y baja con choques, salidas de pista y sanciones. Determina tu licencia.'),
-                _GlossaryItem(
-                    term: 'Incidentes',
-                    def: 'Lo que LFM registra: C = cut (cortaste la pista y la vuelta no cuenta), D = contacto/daño, O = fuera de pista, R = relaunch (te reiniciaste en la pista). Menos es siempre mejor.'),
-                _GlossaryItem(
-                    term: 'Split',
-                    def: 'Grupo de pilotos de nivel parecido en una misma carrera. Los splits se numeran: split 1 = los más rápidos.'),
-                _GlossaryItem(
-                    term: 'Sectores S1/S2/S3',
-                    def: 'El circuito se divide en 3 tramos. Tu vuelta perfecta es la suma de tu mejor S1 + S2 + S3. Ahí se gana o se pierde el tiempo.'),
-                _GlossaryItem(
-                    term: 'SOF (Strength of Field)',
-                    def: 'El rating medio de los pilotos de tu carrera. Ganar en un SOF alto da más puntos y rating.'),
-                _GlossaryItem(
-                    term: 'Best of Week (BOW)',
-                    def: 'Tu mejor resultado de la semana según LFM. Llevas 4 ⭐ — buen ritmo cuando todo sale limpio.'),
-              ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _ActionRow(
+              icon: Icons.menu_book_outlined,
+              label: '¿Qué significa cada cosa?',
+              sub: 'Rating, SR, splits, incidentes, SOF… el glosario completo',
+              onTap: () => Navigator.of(context).pushNamed('/glossary'),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _GlossaryItem extends StatelessWidget {
-  final String term; final String def;
-  const _GlossaryItem({required this.term, required this.def});
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(term, style: const TextStyle(color: AppColors.gold, fontSize: 13, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 2),
-        Text(def, style: const TextStyle(color: AppColors.textDim, fontSize: 12, height: 1.35)),
-      ]),
     );
   }
 }
