@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
 import '../widgets/race_card.dart';
+import '../widgets/feature_search.dart';
 import 'loading_screen.dart';
 import 'race_detail_screen.dart';
 import 'schedule_screen.dart';
-import 'explore_screen.dart';
+import 'home_dashboard.dart';
 
-/// Home: 5 pestañas — Explorar (mapa de todo), Calendario (acción),
-/// Carreras (resultado), Análisis (mejora), Perfil (estado).
+/// Home: 5 pestañas — Inicio (dashboard con datos vivos), Calendario
+/// (acción), Carreras (resultado), Análisis (mejora), Perfil (estado).
 /// Swipe horizontal entre pestañas para navegación fluida.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
 
   static const List<String> _tabTitles = [
-    'Explorar', 'Calendario', 'Carreras', 'Análisis', 'Perfil',
+    'Inicio', 'Calendario', 'Carreras', 'Análisis', 'Perfil',
   ];
 
   @override
@@ -80,6 +81,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ]),
           const Spacer(),
           IconButton(
+            icon: const Icon(Icons.search_rounded, color: AppColors.gold, size: 30),
+            tooltip: 'Buscar',
+            onPressed: () => showFeatureSearch(context, (i) => setState(() => _tab = i)),
+          ),
+          IconButton(
             icon: const Icon(Icons.sync, color: AppColors.gold, size: 32),
             tooltip: 'Sincronizar',
             onPressed: _profileId == null ? null : () async {
@@ -121,8 +127,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: IndexedStack(
                   index: _tab,
                   children: [
-                    // 0. Explorar — el mapa de todo lo que ofrece la app
-                    ExploreScreen(onGoToTab: (i) => setState(() => _tab = i)),
+                    // 0. Inicio — dashboard con tus datos vivos, cada
+                    // tarjeta es una puerta a la herramienta que la explica
+                    HomeDashboardScreen(
+                      profileId: _profileId!,
+                      data: _data!,
+                      insight: _insight,
+                      onGoToTab: (i) => setState(() => _tab = i),
+                    ),
                     // 1. Calendario — la acción: ¿cuándo corro y puedo correr?
                     ScheduleScreen(profileId: _profileId),
                     // 2. Carreras — el resultado: historial completo
@@ -140,9 +152,9 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.explore_outlined, color: AppColors.textDim, size: 28),
-            selectedIcon: Icon(Icons.explore_rounded, color: AppColors.gold, size: 30),
-            label: 'Explorar',
+            icon: Icon(Icons.home_outlined, color: AppColors.textDim, size: 28),
+            selectedIcon: Icon(Icons.home_rounded, color: AppColors.gold, size: 30),
+            label: 'Inicio',
           ),
           NavigationDestination(
             icon: Icon(Icons.today_outlined, color: AppColors.textDim, size: 28),
