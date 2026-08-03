@@ -31,34 +31,23 @@ class _SectorsScreenState extends State<SectorsScreen> {
     }
   }
 
-  String _fmt(num? ms) {
-    if (ms == null) return '—';
-    final total = ms.round();
-    final m = total ~/ 60000;
-    final s = (total % 60000) / 1000.0;
-    return '$m:${s.toStringAsFixed(3).padLeft(6, '0')}';
-  }
+  String _fmt(num? ms) => fmtLap(ms);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Sectores')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+          ? const LoadingView()
           : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.red)))
+              ? ErrorView(message: _error!, onRetry: _load)
               : _data!.isEmpty
-                  ? const Center(child: Padding(padding: EdgeInsets.all(32),
-                      child: Text('Aún no hay vueltas detalladas. Sincroniza para descargar los tiempos por sector.',
-                          textAlign: TextAlign.center, style: TextStyle(color: AppColors.textDim))))
+                  ? const EmptyView(icon: Icons.timer_outlined, message: 'Aún no hay vueltas detalladas.\nSincroniza para descargar los tiempos por sector.')
                   : ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
-                        const Text('¿Dónde pierdes el tiempo?',
-                            style: TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 4),
-                        const Text('Cada tarjeta compara tu mejor S1/S2/S3 contra el más rápido del split. El sector marcado es donde más tiempo se te va por vuelta.',
-                            style: TextStyle(color: AppColors.textDim, fontSize: 12, height: 1.4)),
+                        const SectionTitle('¿Dónde pierdes el tiempo?',
+                            subtitle: 'Cada tarjeta compara tu mejor S1/S2/S3 contra el más rápido del split. El sector marcado es donde más tiempo se te va por vuelta.'),
                         const SizedBox(height: 12),
                         ..._data!.map((e) {
                           final m = Map<String, dynamic>.from(e as Map);
@@ -105,7 +94,7 @@ class _SectorCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.card),
         gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
           colors: [accent.withValues(alpha: 0.10), AppColors.surface],
@@ -120,17 +109,7 @@ class _SectorCard extends StatelessWidget {
                 style: const TextStyle(color: AppColors.text,
                     fontWeight: FontWeight.w800, fontSize: 14.5)),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.cyan.withValues(alpha: 0.13),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.cyan.withValues(alpha: 0.4)),
-            ),
-            child: Text('Split ${m['split']}',
-                style: const TextStyle(color: AppColors.cyan, fontSize: 10,
-                    fontWeight: FontWeight.w700)),
-          ),
+          InfoChip('Split ${m['split']}', color: AppColors.gold),
         ]),
         const SizedBox(height: 2),
         Row(children: [

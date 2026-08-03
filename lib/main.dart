@@ -9,8 +9,10 @@ import 'screens/progression_screen.dart';
 import 'screens/sectors_screen.dart';
 import 'screens/consistency_screen.dart';
 import 'screens/incidents_screen.dart';
+import 'screens/circuit_screen.dart';
 import 'screens/compare_screen.dart';
-import 'screens/races_screen.dart';
+import 'screens/standings_screen.dart';
+import 'screens/achievements_screen.dart';
 
 void main() => runApp(const HeimdallApp());
 
@@ -35,9 +37,10 @@ class HeimdallApp extends StatelessWidget {
         '/analysis/sectors': (_) => const SectorsScreen(),
         '/analysis/consistency': (_) => const ConsistencyScreen(),
         '/analysis/incidents': (_) => const IncidentsScreen(),
+        '/analysis/circuit': (_) => const CircuitScreen(),
         '/analysis/compare': (_) => const CompareScreen(),
-        '/analysis/races': (_) => RacesScreen(
-            profileId: ModalRoute.of(context)!.settings.arguments as int),
+        '/profile/standings': (_) => const StandingsScreen(),
+        '/profile/achievements': (_) => const AchievementsScreen(),
       },
     );
   }
@@ -79,17 +82,19 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: Center(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: const [
-          HeimdallLogo(size: 96),
-          SizedBox(height: 24),
-          Text('HEIMDALL',
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900,
-                  letterSpacing: 8, color: AppColors.text)),
-          SizedBox(height: 8),
-          Text('Analítica de Low Fuel Motorsport',
-              style: TextStyle(color: AppColors.textDim, fontSize: 13)),
-        ]),
+      body: RuneBackground(
+        child: Center(
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: const [
+            HeimdallLogo(size: 96),
+            SizedBox(height: 24),
+            Text('HEIMDALL',
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900,
+                    letterSpacing: 8, color: AppColors.text)),
+            SizedBox(height: 8),
+            Text('Analítica de Low Fuel Motorsport',
+                style: TextStyle(color: AppColors.textDim, fontSize: 13)),
+          ]),
+        ),
       ),
     );
   }

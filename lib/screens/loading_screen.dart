@@ -74,7 +74,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0A1420), Color(0xFF0D1B2E)],
+            colors: [AppColors.bg, AppColors.bg],
           ),
         ),
         child: Center(
@@ -104,7 +104,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text('${(_progress * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(color: AppColors.cyan, fontSize: 13,
+                    style: const TextStyle(color: AppColors.gold, fontSize: 13,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(height: 10),
                 Text(_phase,

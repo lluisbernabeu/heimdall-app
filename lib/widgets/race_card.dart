@@ -60,7 +60,7 @@ class RaceCard extends StatelessWidget {
     final Color posColor = pos == 1
         ? AppColors.gold
         : pos <= 3
-            ? AppColors.cyan
+            ? AppColors.green
             : AppColors.text;
     final rc = (r['rating_change'] as num?)?.toDouble();
     final sc = (r['sr_change'] as num?)?.toDouble();

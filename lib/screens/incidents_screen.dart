@@ -55,7 +55,7 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
     switch (code) {
       case 'D': return AppColors.red;
       case 'C': return AppColors.gold;
-      case 'O': return AppColors.cyan;
+      case 'O': return AppColors.text;
       default: return AppColors.textDim;
     }
   }
@@ -65,9 +65,9 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Incidentes')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+          ? const LoadingView()
           : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.red)))
+              ? ErrorView(message: _error!, onRetry: _load)
               : _body(),
     );
   }
@@ -92,11 +92,8 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('¿En qué te estrellas?',
-            style: TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 4),
-        const Text('Estos son tus incidentes en todas las carreras. Entra en una carrera para ver cada golpe vuelta a vuelta.',
-            style: TextStyle(color: AppColors.textDim, fontSize: 12, height: 1.4)),
+        const SectionTitle('¿En qué te estrellas?',
+            subtitle: 'Estos son tus incidentes en todas las carreras. Entra en una carrera para ver cada golpe vuelta a vuelta.'),
         const SizedBox(height: 12),
         if (dominant != null)
           Container(
@@ -104,7 +101,7 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.red.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.card),
               border: Border.all(color: AppColors.red.withValues(alpha: 0.45)),
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -117,9 +114,11 @@ class _IncidentsScreenState extends State<IncidentsScreen> {
             ]),
           ),
         Row(children: [
-          Expanded(child: _BigCard(label: 'Total incidentes', value: '$total', color: AppColors.red)),
-          Expanded(child: _BigCard(label: 'Tipos distintos', value: '${byType.keys.length}', color: AppColors.cyan)),
+          Expanded(child: StatCard(label: 'Total incidentes', value: '$total', color: AppColors.red)),
+          Expanded(child: StatCard(label: 'Tipos distintos', value: '${byType.keys.length}', color: AppColors.gold)),
         ]),
+        const SizedBox(height: 12),
+        const _SrCostCard(),
         const SizedBox(height: 16),
         const Text('Cuándo pasan (minuto de carrera)',
             style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w700)),
@@ -296,7 +295,7 @@ class _RaceIncidentsScreenState extends State<RaceIncidentsScreen> {
     switch (code) {
       case 'D': return AppColors.red;
       case 'C': return AppColors.gold;
-      case 'O': return AppColors.cyan;
+      case 'O': return AppColors.text;
       default: return AppColors.textDim;
     }
   }
@@ -306,9 +305,9 @@ class _RaceIncidentsScreenState extends State<RaceIncidentsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+          ? const LoadingView()
           : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.red)))
+              ? ErrorView(message: _error!, onRetry: _load)
               : _body(),
     );
   }
@@ -332,10 +331,10 @@ class _RaceIncidentsScreenState extends State<RaceIncidentsScreen> {
       padding: const EdgeInsets.all(16),
       children: [
         Row(children: [
-          Expanded(child: _BigCard(label: 'Incidentes', value: '$total', color: AppColors.red)),
-          Expanded(child: _BigCard(
+          Expanded(child: StatCard(label: 'Incidentes', value: '$total', color: AppColors.red)),
+          Expanded(child: StatCard(
               label: 'P${race['finish_pos'] ?? '—'} · ${fmtDateHora(race['race_date'])}',
-              value: '${race['laps'] ?? '—'} vueltas', color: AppColors.cyan)),
+              value: '${race['laps'] ?? '—'} vueltas', color: AppColors.gold)),
         ]),
         const SizedBox(height: 12),
         if (counts.isNotEmpty)
@@ -411,24 +410,82 @@ class _RaceIncidentsScreenState extends State<RaceIncidentsScreen> {
   }
 }
 
-class _BigCard extends StatelessWidget {
-  final String label; final String value; final Color color;
-  const _BigCard({required this.label, required this.value, required this.color});
+/// Cuánto cuesta cada tipo de incidente en SR según la taxonomía oficial LFM.
+/// Datos cacheados en BD (regla nº1) — carga ligera, falla silencioso.
+class _SrCostCard extends StatefulWidget {
+  const _SrCostCard();
+  @override
+  State<_SrCostCard> createState() => _SrCostCardState();
+}
+
+class _SrCostCardState extends State<_SrCostCard> {
+  List<Map> _reasons = [];
+  bool _done = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final d = await ApiClient.get('/api/global/incident-reasons');
+      if (!mounted) return;
+      setState(() {
+        _reasons = ((d['reasons'] as List?) ?? []).cast<Map>();
+        _done = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _done = true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!_done || _reasons.isEmpty) return const SizedBox.shrink();
+    // Top causas con penalización SR (ordenadas por la más cara primero)
+    final withPenalty = _reasons
+        .where((r) => (r['self_acceptance_sr_penalty'] as num?) != null)
+        .toList()
+      ..sort((a, b) => (b['self_acceptance_sr_penalty'] as num)
+          .compareTo(a['self_acceptance_sr_penalty'] as num));
+    final top = withPenalty.take(4).toList();
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.surfaceAlt),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
       ),
-      child: Column(children: [
-        Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 4),
-        Text(label, textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textDim, fontSize: 10)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.shield_rounded, color: AppColors.gold, size: 16),
+          const SizedBox(width: 6),
+          const Text('CUÁNTO CUESTA EN SR (LFM)',
+              style: TextStyle(color: AppColors.gold, fontSize: 10,
+                  fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+        ]),
+        const SizedBox(height: 8),
+        for (final r in top)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(children: [
+              Expanded(
+                child: Text('${r['reason_text_en'] ?? ''}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.textDim, fontSize: 11.5)),
+              ),
+              const SizedBox(width: 8),
+              Text('-${(r['self_acceptance_sr_penalty'] as num).toStringAsFixed(2)} SR',
+                  style: TextStyle(
+                      color: (r['self_acceptance_sr_penalty'] as num) >= 1
+                          ? AppColors.red : AppColors.gold,
+                      fontSize: 12, fontWeight: FontWeight.w800)),
+            ]),
+          ),
       ]),
     );
   }

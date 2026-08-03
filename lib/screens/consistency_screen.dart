@@ -32,19 +32,14 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
     }
   }
 
-  String _fmt(num? ms) {
-    if (ms == null) return '—';
-    final total = ms.round();
-    final m = total ~/ 60000;
-    final s = (total % 60000) / 1000.0;
-    return '$m:${s.toStringAsFixed(3).padLeft(6, '0')}';
-  }
+  String _fmt(num? ms) => fmtLap(ms);
 
   /// Categoría: <1s muy consistente, <2.5s normal, >=2.5s irregular.
+  /// Semántica unificada: verde=bueno, dorado=aviso, rojo=malo.
   (String, Color) _verdict(double stdMs) {
     if (stdMs < 1000) return ('Muy consistente', AppColors.green);
-    if (stdMs < 2500) return ('Normal', AppColors.cyan);
-    return ('Irregular', AppColors.gold);
+    if (stdMs < 2500) return ('Normal', AppColors.gold);
+    return ('Irregular', AppColors.red);
   }
 
   @override
@@ -52,11 +47,11 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Consistencia')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+          ? const LoadingView()
           : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.red)))
+              ? ErrorView(message: _error!, onRetry: _load)
               : _data!.isEmpty
-                  ? const Center(child: Text('Sin datos', style: TextStyle(color: AppColors.textDim)))
+                  ? const EmptyView(icon: Icons.speed, message: 'Sin datos todavía.\nSincroniza para analizar tu constancia.')
                   : _body(),
     );
   }
@@ -71,15 +66,12 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('¿Qué tan regulares son tus vueltas?',
-            style: TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 4),
-        const Text('La desviación estándar (σ) mide cuánto varían tus tiempos entre vueltas: cuanto más baja, más constante es tu ritmo.',
-            style: TextStyle(color: AppColors.textDim, fontSize: 12, height: 1.4)),
+        const SectionTitle('¿Qué tan regulares son tus vueltas?',
+            subtitle: 'La desviación estándar (σ) mide cuánto varían tus tiempos entre vueltas: cuanto más baja, más constante es tu ritmo. La vuelta 1 se ignora — la salida siempre es un caos y no refleja tu ritmo real.'),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: _KpiCard(label: 'Media σ', value: '${(avgStd / 1000).toStringAsFixed(3)}s', color: AppColors.cyan)),
-          Expanded(child: _KpiCard(label: 'Tu mejor racha', value: '${(bestStd / 1000).toStringAsFixed(3)}s', color: AppColors.green)),
+          Expanded(child: StatCard(label: 'Media σ', value: '${(avgStd / 1000).toStringAsFixed(3)}s', color: AppColors.gold)),
+          Expanded(child: StatCard(label: 'Tu mejor racha', value: '${(bestStd / 1000).toStringAsFixed(3)}s', color: AppColors.green)),
         ]),
         const SizedBox(height: 16),
         SizedBox(height: 180,
@@ -145,7 +137,8 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
                             fontSize: 13.5, fontWeight: FontWeight.w700),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
-                    Text('${fmtDate(m['race_date'])} · ${m['laps']} vueltas',
+                    Text('${fmtDate(m['race_date'])} · ${m['laps']} vueltas'
+                        '${(m['laps_total'] as num?)?.toInt() != null && (m['laps_total'] as num).toInt() != (m['laps'] as num).toInt() ? ' (${m['laps_total']} con salida)' : ''}',
                         style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
                   ]),
                 ),
@@ -160,6 +153,9 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
               if (bestMs != null && worstMs != null && spreadMs != null) ...[
                 Text('Mejor vuelta ${_fmt(bestMs)} · peor ${_fmt(worstMs)} · diferencia ${(spreadMs / 1000).toStringAsFixed(2)}s',
                     style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+                if (m['first_lap_ms'] != null)
+                  Text('Vuelta 1 (salida): ${_fmt((m['first_lap_ms'] as num).toDouble())} · excluida de la σ',
+                      style: const TextStyle(color: AppColors.textDim, fontSize: 10.5)),
                 if (spreadMs > 2500)
                   Text('⚠️ La diferencia entre tu mejor y peor vuelta es grande: hay una vuelta que se te fue. Revisa qué pasó (tráfico, incidente o pérdida de concentración).',
                       style: TextStyle(color: AppColors.gold, fontSize: 10.5, height: 1.35)),
@@ -168,29 +164,6 @@ class _ConsistencyScreenState extends State<ConsistencyScreen> {
           );
         }),
       ],
-    );
-  }
-}
-
-class _KpiCard extends StatelessWidget {
-  final String label; final String value; final Color color;
-  const _KpiCard({required this.label, required this.value, required this.color});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.surfaceAlt),
-      ),
-      child: Column(children: [
-        Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 4),
-        Text(label, textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textDim, fontSize: 10)),
-      ]),
     );
   }
 }

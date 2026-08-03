@@ -61,16 +61,11 @@ class _CompareScreenState extends State<CompareScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Comparar pilotos')),
       body: _loading && _data == null
-          ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+          ? const LoadingView()
           : _error != null
-              ? Center(child: Padding(padding: const EdgeInsets.all(32),
-                  child: Text(_error!, textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.red))))
+              ? ErrorView(message: _error!, onRetry: _compare)
               : _profiles.length < 2
-                  ? const Center(child: Padding(padding: EdgeInsets.all(32),
-                      child: Text('Necesitas al menos 2 pilotos con datos para comparar.\n'
-                          'Sincroniza tu perfil o el de otro piloto.',
-                          textAlign: TextAlign.center, style: TextStyle(color: AppColors.textDim))))
+                  ? const EmptyView(icon: Icons.compare_arrows, message: 'Necesitas al menos 2 pilotos con datos para comparar.\nSincroniza tu perfil o el de otro piloto.')
                   : _body(),
     );
   }

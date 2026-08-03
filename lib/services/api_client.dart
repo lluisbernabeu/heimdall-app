@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -63,6 +64,17 @@ class ApiClient {
   static Future<dynamic> get(String path) => _req('GET', path);
   static Future<dynamic> post(String path, {Object? body, bool auth = true}) =>
       _req('POST', path, body: body, auth: auth);
+
+  /// GET que devuelve bytes (imágenes/PNG). Requiere auth si `auth` es true.
+  static Future<Uint8List> getBytes(String path, {bool auth = true}) async {
+    final token = auth ? await getToken() : null;
+    final uri = Uri.parse('$base$path');
+    final res = await http.get(uri, headers: _headers(token)).timeout(const Duration(seconds: 45));
+    if (res.statusCode != 200) {
+      throw ApiException('Error ${res.statusCode} descargando recurso');
+    }
+    return res.bodyBytes;
+  }
 }
 
 class ApiException implements Exception {

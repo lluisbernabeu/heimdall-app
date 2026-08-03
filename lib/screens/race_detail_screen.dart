@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
 
@@ -15,8 +16,10 @@ class RaceDetailScreen extends StatefulWidget {
 class _RaceDetailScreenState extends State<RaceDetailScreen> {
   Map<String, dynamic>? _data;
   Map<String, dynamic>? _story;
+  Map<String, dynamic>? _replay;
   bool _loading = true;
   String? _error;
+  dynamic _highlightUid; // piloto resaltado en la gráfica (null = ninguno)
 
   @override
   void initState() { super.initState(); _load(); }
@@ -26,10 +29,12 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
       final results = await Future.wait([
         ApiClient.get('/api/profile/${widget.profileId}/races/${widget.raceId}'),
         ApiClient.get('/api/profile/${widget.profileId}/races/${widget.raceId}/story'),
+        ApiClient.get('/api/profile/${widget.profileId}/races/${widget.raceId}/replay'),
       ]);
       setState(() {
         _data = Map<String, dynamic>.from(results[0] as Map);
         _story = Map<String, dynamic>.from(results[1] as Map);
+        _replay = Map<String, dynamic>.from(results[2] as Map);
         _loading = false;
       });
     } catch (e) {
@@ -37,24 +42,528 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
     }
   }
 
-  String _fmt(num? ms) {
-    if (ms == null) return '—';
-    final total = ms.round();
-    final m = total ~/ 60000;
-    final s = (total % 60000) / 1000.0;
-    return '$m:${s.toStringAsFixed(3).padLeft(6, '0')}';
+  // ===================================================================
+  // PESTAÑA 3 — REPLAY (posición vuelta a vuelta + comparativa sectores)
+  // ===================================================================
+  Widget _replayView() {
+    final rep = _replay!;
+    final chart = (rep['position_chart'] as List? ?? []).cast<Map>();
+    final lapPilots = (rep['lap_pilots'] as List? ?? []).cast<Map>();
+    final myUid = _data!['my_user_id'];
+    final vod = rep['vod_link']?.toString();
+    final live = rep['live_video']?.toString();
+    final videolink = rep['videolink']?.toString();
+    final vods = <String>{
+      if (vod != null && vod.isNotEmpty) vod,
+      if (live != null && live.isNotEmpty) live,
+      if (videolink != null && videolink.isNotEmpty) videolink,
+    }.toList();
+    final multiTwitch = (rep['multiTwitch'] as List? ?? [])
+        .expand((e) => e is List ? e : [e])
+        .whereType<String>()
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    if (chart.isEmpty && lapPilots.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('No hay datos de replay para esta carrera todavía.\n'
+              'Pulsa sincronizar para intentar descargarlos.',
+              textAlign: TextAlign.center, style: TextStyle(color: AppColors.textDim)),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: AppColors.gold,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Enlaces de video/stream si los hay
+          if (vods.isNotEmpty || multiTwitch.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.red.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.red.withValues(alpha: 0.5)),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('📺 Esta carrera fue transmitida',
+                    style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w800, fontSize: 14)),
+                const SizedBox(height: 8),
+                for (final v in vods)
+                  _linkButton('▶️ Ver VOD en YouTube', v, AppColors.red),
+                for (final t in multiTwitch)
+                  _linkButton('🔴 Stream en Twitch', 'https://www.twitch.tv/$t', AppColors.red),
+              ]),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Gráfica de posiciones
+          const Text('Posiciones vuelta a vuelta',
+              style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 2),
+          Text('Dorado = tú · toca un piloto de la lista para seguir su línea.',
+              style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+          const SizedBox(height: 10),
+          if (chart.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.fromLTRB(8, 12, 16, 8),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.surfaceAlt),
+              ),
+              child: Column(children: [
+                SizedBox(height: 240, child: _positionChart(chart, myUid)),
+                const SizedBox(height: 6),
+                ..._chartLegend(chart, myUid),
+              ]),
+            ),
+          const SizedBox(height: 16),
+
+          // Comparativa de sectores
+          if (lapPilots.isNotEmpty)
+            _sectorComparison(lapPilots, myUid),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
   }
+
+  /// Gráfico de líneas: posición (invertida, P1 arriba) por vuelta.
+  /// Colores estables por piloto (índice en el chart).
+  /// Paleta mineral desaturada que armoniza con negro+oro. El dorado
+  /// queda reservado para TÚ (goldLight) — los rivales NUNCA usan oro.
+  static const List<Color> _palette = [
+    Color(0xFFC8786A), Color(0xFF7EA6C4), Color(0xFF8FC48A),
+    Color(0xFFC4A06A), Color(0xFFA67EC4), Color(0xFF6AB8B8),
+    Color(0xFFC48A5E), Color(0xFF9AB86A), Color(0xFFC46A9E),
+    Color(0xFF6A9EC4), Color(0xFFB8B86A), Color(0xFF7EC4A0),
+    Color(0xFFC46A6A), Color(0xFF8A8AC4), Color(0xFFA0C46A),
+    Color(0xFFC4A0B8), Color(0xFF6AC49E), Color(0xFF9E6AC4),
+  ];
+
+  Widget _positionChart(List<Map> chart, dynamic myUid) {
+    // max vuelta para el eje X
+    int maxLap = 1;
+    for (final p in chart) {
+      for (final l in (p['laps'] as List? ?? [])) {
+        final lap = (l is Map ? l['lap'] : null) as num?;
+        if (lap != null && lap > maxLap) maxLap = lap.toInt();
+      }
+    }
+
+    final bars = <LineChartBarData>[];
+    for (int i = 0; i < chart.length; i++) {
+      final p = chart[i];
+      final isMe = p['user_id'] == myUid;
+      final isHl = p['user_id'] == _highlightUid;
+      final laps = (p['laps'] as List? ?? []).cast<Map>();
+      final spots = <FlSpot>[];
+      for (final l in laps) {
+        final lap = l['lap'] as num?;
+        final pos = l['position'] as num?;
+        if (lap != null && pos != null) {
+          // invertir: P1 arriba
+          spots.add(FlSpot(lap.toDouble(), -pos.toDouble()));
+        }
+      }
+      if (spots.isEmpty) continue;
+
+      // Diseño legible: TÚ dorado grueso; el resaltado en su color;
+      // el resto gris tenue (o en su color suave si no hay resaltado).
+      Color color;
+      double width;
+      if (isMe) {
+        color = AppColors.goldLight;
+        width = 4;
+      } else if (isHl) {
+        color = _palette[i % _palette.length];
+        width = 3.2;
+      } else if (_highlightUid == null) {
+        color = _palette[i % _palette.length].withValues(alpha: 0.30);
+        width = 1.6;
+      } else {
+        color = AppColors.textDim.withValues(alpha: 0.12);
+        width = 1.2;
+      }
+
+      bars.add(LineChartBarData(
+        spots: spots,
+        color: color,
+        barWidth: width,
+        isCurved: false,
+        preventCurveOverShooting: true,
+        dotData: FlDotData(show: false),
+      ));
+    }
+
+    // invertir eje Y: -P -> +P (P1 arriba)
+    int maxPos = 1;
+    for (final p in chart) {
+      for (final l in (p['laps'] as List? ?? [])) {
+        final pos = (l is Map ? l['position'] : null) as num?;
+        if (pos != null && pos > maxPos) maxPos = pos.toInt();
+      }
+    }
+
+    return LineChart(
+      LineChartData(
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: 2,
+          getDrawingHorizontalLine: (v) => FlLine(
+            color: AppColors.surfaceAlt.withValues(alpha: 0.6),
+            strokeWidth: 0.8,
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 30,
+              getTitlesWidget: (v, meta) => Text('P${(-v).round()}',
+                  style: const TextStyle(color: AppColors.textDim, fontSize: 9)),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 20,
+              interval: maxLap > 12 ? 2 : 1,
+              getTitlesWidget: (v, meta) => Text('V${v.round()}',
+                  style: const TextStyle(color: AppColors.textDim, fontSize: 9)),
+            ),
+          ),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        minX: 0,
+        maxX: maxLap.toDouble(),
+        minY: -maxPos.toDouble(),
+        maxY: -1.0,
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => AppColors.surfaceAlt,
+            getTooltipItems: (touchedSpots) {
+              final items = <LineTooltipItem>[];
+              for (final t in touchedSpots) {
+                if (t.barIndex >= chart.length) continue;
+                final p = chart[t.barIndex];
+                final uid = p['user_id'];
+                // si hay resaltado, solo mostramos el resaltado y TÚ
+                if (_highlightUid != null && uid != _highlightUid && uid != myUid) {
+                  continue;
+                }
+                final isMe = uid == myUid;
+                items.add(LineTooltipItem(
+                  '${p['driver'] ?? ''}  P${(-t.y).round()}',
+                  TextStyle(
+                    color: isMe ? AppColors.goldLight : AppColors.text,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ));
+              }
+              return items;
+            },
+          ),
+        ),
+        lineBarsData: bars,
+      ),
+    );
+  }
+
+  /// Leyenda de la gráfica: tocar un piloto lo resalta en su color.
+  List<Widget> _chartLegend(List<Map> chart, dynamic myUid) {
+    return chart.asMap().entries.map((e) {
+      final i = e.key;
+      final p = e.value;
+      final isMe = p['user_id'] == myUid;
+      final isHl = p['user_id'] == _highlightUid;
+      final laps = (p['laps'] as List? ?? []);
+      final finish = laps.isNotEmpty ? (laps.last is Map ? laps.last['position'] : null) : null;
+
+      Color color;
+      if (isMe) {
+        color = AppColors.goldLight;
+      } else if (isHl || _highlightUid == null) {
+        color = _palette[i % _palette.length];
+      } else {
+        color = AppColors.textDim.withValues(alpha: 0.30);
+      }
+
+      return InkWell(
+        onTap: () => setState(() {
+          _highlightUid = isHl ? null : p['user_id'];
+        }),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(children: [
+            Container(
+              width: 10, height: 10,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: isHl
+                    ? Border.all(color: AppColors.text, width: 1.2)
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('${p['driver'] ?? ''}',
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: isMe ? AppColors.goldLight : AppColors.textDim,
+                      fontSize: 11,
+                      fontWeight: isMe ? FontWeight.w800 : FontWeight.w500)),
+            ),
+            Text(finish != null ? 'P$finish' : '',
+                style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+          ]),
+        ),
+      );
+    }).toList();
+  }
+
+  /// Comparativa de sectores: TÚ vs rival seleccionable (por defecto el ganador).
+  Widget _sectorComparison(List<Map> lapPilots, dynamic myUid) {
+    // identificar mi piloto y el rival (ganador por defecto)
+    Map? me;
+    for (final p in lapPilots) {
+      if (p['user_id'] == myUid) { me = p; break; }
+    }
+    final rivals = lapPilots.where((p) => p['user_id'] != myUid).toList();
+    if (me == null && rivals.isNotEmpty) {
+      // si no me identifico, comparo a los dos primeros
+      me = lapPilots.first;
+      rivals.removeWhere((p) => p == me);
+    }
+    if (me == null || rivals.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    rivals.sort((a, b) => ((a['position'] as num?) ?? 999)
+        .compareTo((b['position'] as num?) ?? 999));
+    Map rival = rivals.first; // el que quedó mejor (ganador normalmente)
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        final myLaps = (me!['laps'] as List? ?? []).cast<Map>();
+        final rivLaps = (rival['laps'] as List? ?? []).cast<Map>();
+        final rivByLap = {for (final l in rivLaps) (l['lap'] as num?)?.toInt(): l};
+
+        // resumen por sector: suma de deltas (tú - rival) en vueltas válidas
+        num s1 = 0, s2 = 0, s3 = 0, total = 0;
+        int n = 0;
+        final rows = <Map>[];
+        for (final ml in myLaps) {
+          final lapNum = (ml['lap'] as num?)?.toInt();
+          final rl = lapNum != null ? rivByLap[lapNum] : null;
+          if (rl == null) continue;
+          final d1 = (ml['s1_ms'] as num?) != null && (rl['s1_ms'] as num?) != null
+              ? (ml['s1_ms'] as num) - (rl['s1_ms'] as num) : null;
+          final d2 = (ml['s2_ms'] as num?) != null && (rl['s2_ms'] as num?) != null
+              ? (ml['s2_ms'] as num) - (rl['s2_ms'] as num) : null;
+          final d3 = (ml['s3_ms'] as num?) != null && (rl['s3_ms'] as num?) != null
+              ? (ml['s3_ms'] as num) - (rl['s3_ms'] as num) : null;
+          final valid = ml['valid'] == true && rl['valid'] == true;
+          if (!valid) continue;
+          if (d1 != null) s1 += d1;
+          if (d2 != null) s2 += d2;
+          if (d3 != null) s3 += d3;
+          final dTotal = (d1 ?? 0) + (d2 ?? 0) + (d3 ?? 0);
+          total += dTotal;
+          n++;
+          rows.add({
+            'lap': lapNum,
+            'd1': d1, 'd2': d2, 'd3': d3,
+            'total': dTotal,
+            'myTime': ml['time_ms'], 'rivTime': rl['time_ms'],
+          });
+        }
+
+        // ¿dónde le ganas?
+        String where = '';
+        if (n > 0) {
+          final parts = <String>[];
+          if (s1 < 0) parts.add('S1 le ganas ${_signed(-s1)}');
+          if (s2 < 0) parts.add('S2 le ganas ${_signed(-s2)}');
+          if (s3 < 0) parts.add('S3 le ganas ${_signed(-s3)}');
+          final loses = <String>[];
+          if (s1 > 0) loses.add('S1 pierdes ${_signed(s1)}');
+          if (s2 > 0) loses.add('S2 pierdes ${_signed(s2)}');
+          if (s3 > 0) loses.add('S3 pierdes ${_signed(s3)}');
+          where = [if (parts.isNotEmpty) 'Ganas: ${parts.join(', ')}',
+                   if (loses.isNotEmpty) 'Pierdes: ${loses.join(', ')}'].join('  ·  ');
+        }
+
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Comparativa por sectores',
+              style: TextStyle(color: AppColors.text, fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 2),
+          Text('Tú vs rival · verde = le ganas · rojo = pierdes.',
+              style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
+          const SizedBox(height: 8),
+          // selector de rival
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              for (final r in rivals)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    label: Text('${r['name'] ?? ''} (P${r['position'] ?? '?'})',
+                        style: const TextStyle(fontSize: 11)),
+                    selected: r == rival,
+                    selectedColor: AppColors.cyan.withValues(alpha: 0.25),
+                    backgroundColor: AppColors.surfaceAlt,
+                    labelStyle: TextStyle(
+                        color: r == rival ? AppColors.cyan : AppColors.textDim,
+                        fontSize: 11),
+                    onSelected: (_) => setState(() => rival = r),
+                  ),
+                ),
+            ]),
+          ),
+          const SizedBox(height: 10),
+
+          // resumen donde ganas/pierdes
+          if (where.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.cyan.withValues(alpha: 0.35)),
+              ),
+              child: Text(where,
+                  style: const TextStyle(color: AppColors.text, fontSize: 12, height: 1.35)),
+            ),
+
+          // tabla vuelta a vuelta
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.surfaceAlt),
+            ),
+            child: Column(children: [
+              // cabecera
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Row(children: const [
+                  SizedBox(width: 30, child: Text('V', style: TextStyle(color: AppColors.textDim, fontSize: 10))),
+                  Expanded(child: Text('S1', style: TextStyle(color: AppColors.textDim, fontSize: 10))),
+                  Expanded(child: Text('S2', style: TextStyle(color: AppColors.textDim, fontSize: 10))),
+                  Expanded(child: Text('S3', style: TextStyle(color: AppColors.textDim, fontSize: 10))),
+                  Expanded(child: Text('Total', style: TextStyle(color: AppColors.textDim, fontSize: 10))),
+                ]),
+              ),
+              const Divider(height: 1, color: AppColors.surfaceAlt),
+              for (final row in rows.take(30))
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  child: Row(children: [
+                    SizedBox(width: 30, child: Text('V${row['lap']}',
+                        style: const TextStyle(color: AppColors.textDim, fontSize: 11))),
+                    Expanded(child: _deltaCell(row['d1'])),
+                    Expanded(child: _deltaCell(row['d2'])),
+                    Expanded(child: _deltaCell(row['d3'])),
+                    Expanded(child: _deltaCell(row['total'], bold: true)),
+                  ]),
+                ),
+              if (n > 0) ...[
+                const Divider(height: 1, color: AppColors.surfaceAlt),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: Row(children: [
+                    const SizedBox(width: 30, child: Text('Σ', style: TextStyle(color: AppColors.textDim, fontSize: 11))),
+                    Expanded(child: _deltaCell(s1)),
+                    Expanded(child: _deltaCell(s2)),
+                    Expanded(child: _deltaCell(s3)),
+                    Expanded(child: _deltaCell(total, bold: true)),
+                  ]),
+                ),
+              ],
+            ]),
+          ),
+          const SizedBox(height: 4),
+          Text('Valores en ms · (tú − rival): negativo = tú más rápido.',
+              style: const TextStyle(color: AppColors.textDim, fontSize: 10)),
+        ]);
+      },
+    );
+  }
+
+  Widget _deltaCell(dynamic ms, {bool bold = false}) {
+    final num? v = ms is num ? ms : null;
+    final String label = v == null
+        ? '—'
+        : '${v >= 0 ? '+' : ''}${(v / 1000).toStringAsFixed(2)}';
+    final Color c = v == null ? AppColors.textDim
+        : v == 0 ? AppColors.textDim
+        : v < 0 ? AppColors.green : AppColors.red;
+    return Text(label,
+        style: TextStyle(color: c, fontSize: bold ? 12 : 11,
+            fontWeight: bold ? FontWeight.w800 : FontWeight.w600));
+  }
+
+  String _signed(num ms) {
+    return '${(ms / 1000).toStringAsFixed(2)}s';
+  }
+
+  Widget _linkButton(String label, String url, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        onTap: () async {
+          try {
+            final uri = Uri.parse(url);
+            if (await _canLaunch(uri)) await _launch(uri);
+          } catch (_) {}
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withValues(alpha: 0.5)),
+          ),
+          child: Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _canLaunch(Uri uri) async => true;
+  Future<void> _launch(Uri uri) async {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  String _fmt(num? ms) => fmtLap(ms);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Detalle de carrera')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+          ? const LoadingView()
           : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.red)))
+              ? ErrorView(message: _error!, onRetry: _load)
               : DefaultTabController(
-                  length: 2,
+                  length: 3,
                   child: Column(children: [
                     Container(
                       color: AppColors.surface,
@@ -62,6 +571,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
                         tabs: [
                           Tab(text: 'Qué pasó'),
                           Tab(text: 'Datos'),
+                          Tab(text: 'Replay'),
                         ],
                       ),
                     ),
@@ -69,6 +579,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
                       child: TabBarView(children: [
                         _storyView(),
                         _dataView(),
+                        _replayView(),
                       ]),
                     ),
                   ]),
@@ -263,7 +774,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
                           Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: Text('P${l['position']}',
-                                style: const TextStyle(color: AppColors.cyan, fontSize: 12,
+                                style: const TextStyle(color: AppColors.gold, fontSize: 12,
                                     fontWeight: FontWeight.w700)),
                           ),
                         if (bestValidMs != null && l['time_ms'] != null &&
@@ -297,9 +808,9 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
             const SizedBox(height: 8),
             ...ahead.map<Widget>((raw) {
               final a = Map<String, dynamic>.from(raw as Map);
-              final tone = a['tone']?.toString() ?? 'cyan';
+              final tone = a['tone']?.toString() ?? 'gold';
               final Color c = tone == 'green' ? AppColors.green
-                  : tone == 'red' ? AppColors.red : AppColors.cyan;
+                  : tone == 'red' ? AppColors.red : AppColors.gold;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(12),
@@ -361,7 +872,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [Color(0xFF16283C), Color(0xFF0D1B2E)],
+              colors: [AppColors.surfaceAlt, AppColors.bg],
             ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.surfaceAlt),
@@ -396,7 +907,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
             Wrap(spacing: 10, runSpacing: 8, children: [
               _chip('P${race['finish_pos']}', AppColors.gold),
               _chip('Salida ${race['start_pos']}', AppColors.textDim),
-              _chip('Split ${race['split']}', AppColors.cyan),
+              _chip('Split ${race['split']}', AppColors.gold),
               if (race['best_lap'] != null) _chip('Mejor ${race['best_lap']}', AppColors.green),
               if (race['rating_change'] != null)
                 _chip('Rtg ${(race['rating_change'] as num) >= 0 ? '+' : ''}${race['rating_change']}',
@@ -475,7 +986,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
               // Tiempo + gap
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                 Text(_fmt(p['best_lap_ms']),
-                    style: const TextStyle(color: AppColors.cyan, fontSize: 13,
+                    style: const TextStyle(color: AppColors.gold, fontSize: 13,
                         fontWeight: FontWeight.w700)),
                 if (gapMs != null && gapMs > 0)
                   Text('+${_fmt(gapMs)}',
@@ -618,7 +1129,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
                       fontWeight: FontWeight.w800)),
               const Spacer(),
               if (lap['position'] != null)
-                _chip('P${lap['position']}', AppColors.cyan),
+                _chip('P${lap['position']}', AppColors.gold),
               const SizedBox(width: 6),
               _chip(valid ? 'Válida' : 'No contó', valid ? AppColors.green : AppColors.red),
             ]),
@@ -718,7 +1229,7 @@ class _RaceDetailScreenState extends State<RaceDetailScreen> {
           Text(label, style: const TextStyle(color: AppColors.textDim, fontSize: 11)),
           const SizedBox(height: 4),
           Text(_fmt(ms),
-              style: const TextStyle(color: AppColors.cyan, fontSize: 15,
+              style: const TextStyle(color: AppColors.gold, fontSize: 15,
                   fontWeight: FontWeight.w700)),
         ]),
       ),

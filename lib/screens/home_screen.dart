@@ -4,8 +4,10 @@ import '../theme.dart';
 import '../widgets/race_card.dart';
 import 'loading_screen.dart';
 import 'race_detail_screen.dart';
+import 'schedule_screen.dart';
 
-/// Home: 3 pestañas — Resumen (insight), Análisis (herramientas), Carreras.
+/// Home: 4 pestañas por importancia — Calendario (acción), Carreras
+/// (resultado), Análisis (mejora), Perfil (estado).
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -65,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const Text('Heimdall'),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.sync, color: AppColors.cyan, size: 32),
+            icon: const Icon(Icons.sync, color: AppColors.gold, size: 32),
             tooltip: 'Sincronizar',
             onPressed: _profileId == null ? null : () async {
               try {
@@ -94,14 +96,20 @@ class _HomeScreenState extends State<HomeScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
           : _error != null
               ? _ErrorView(msg: _error!, onRetry: _load)
-              : IndexedStack(
+              : RuneBackground(
+                  child: IndexedStack(
                   index: _tab,
                   children: [
-                    _SummaryTab(data: _data!, insight: _insight, onRefresh: _load),
-                    _AnalysisTab(data: _data!, insight: _insight, onPush: _push),
+                    // 1. Calendario — la acción: ¿cuándo corro y puedo correr?
+                    ScheduleScreen(profileId: _profileId),
+                    // 2. Carreras — el resultado: historial completo
                     _RacesTab(profileId: _profileId!),
+                    // 3. Análisis — la mejora: diagnóstico + herramientas
+                    _AnalysisTab(data: _data!, insight: _insight, onPush: _push),
+                    // 4. Perfil — el estado: veredicto + cifras + tendencia
+                    _SummaryTab(data: _data!, insight: _insight, onRefresh: _load),
                   ],
-                ),
+                )),
       bottomNavigationBar: NavigationBar(
         backgroundColor: AppColors.surface,
         indicatorColor: AppColors.gold.withValues(alpha: 0.22),
@@ -109,9 +117,14 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.insights_outlined, color: AppColors.textDim, size: 32),
-            selectedIcon: Icon(Icons.insights, color: AppColors.gold, size: 34),
-            label: 'Resumen',
+            icon: Icon(Icons.today_outlined, color: AppColors.textDim, size: 32),
+            selectedIcon: Icon(Icons.today, color: AppColors.gold, size: 34),
+            label: 'Calendario',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.flag_outlined, color: AppColors.textDim, size: 32),
+            selectedIcon: Icon(Icons.flag, color: AppColors.gold, size: 34),
+            label: 'Carreras',
           ),
           NavigationDestination(
             icon: Icon(Icons.analytics_outlined, color: AppColors.textDim, size: 32),
@@ -119,9 +132,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Análisis',
           ),
           NavigationDestination(
-            icon: Icon(Icons.flag_outlined, color: AppColors.textDim, size: 32),
-            selectedIcon: Icon(Icons.flag, color: AppColors.gold, size: 34),
-            label: 'Carreras',
+            icon: Icon(Icons.person_outline, color: AppColors.textDim, size: 32),
+            selectedIcon: Icon(Icons.person, color: AppColors.gold, size: 34),
+            label: 'Perfil',
           ),
         ],
       ),
@@ -129,10 +142,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _push(String route) {
-    if (route == '/analysis/races') {
-      Navigator.of(context).pushNamed(route, arguments: _profileId);
-      return;
-    }
     Navigator.of(context).pushNamed(route);
   }
 }
@@ -151,7 +160,7 @@ class _SummaryTab extends StatelessWidget {
       case 'red': return AppColors.red;
       case 'green': return AppColors.green;
       case 'orange': return const Color(0xFFE8A33D);
-      default: return AppColors.cyan;
+      default: return AppColors.gold;
     }
   }
 
@@ -170,7 +179,6 @@ class _SummaryTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = (data['profile'] as Map? ?? {});
     final verdict = (insight?['verdict'] as Map? ?? {});
-    final insights = (insight?['insights'] as List? ?? []);
     final action = (insight?['action'] as Map? ?? {});
     final vColor = _toneColor(verdict['tone']?.toString() ?? 'cyan');
 
@@ -187,7 +195,7 @@ class _SummaryTab extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft, end: Alignment.bottomRight,
-                colors: [Color(0xFF1A2C44), Color(0xFF0D1B2E)],
+                colors: [AppColors.surfaceAlt, AppColors.bg],
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
@@ -220,7 +228,7 @@ class _SummaryTab extends StatelessWidget {
                           color: AppColors.text)),
                   const SizedBox(height: 4),
                   Wrap(spacing: 6, runSpacing: 4, children: [
-                    _Badge(text: p['license']?.toString() ?? '—', color: AppColors.cyan),
+                    _Badge(text: p['license']?.toString() ?? '—', color: AppColors.gold),
                     _Badge(text: 'SR ${p['safety_rating']?.toString() ?? '—'}', color: AppColors.green),
                     if (p['origin'] != null) _Badge(text: p['origin'].toString(), color: AppColors.gold),
                   ]),
@@ -257,41 +265,11 @@ class _SummaryTab extends StatelessWidget {
             ]),
           ),
 
-          // Señales
-          ...insights.map<Widget>((raw) {
-            final i = Map<String, dynamic>.from(raw as Map);
-            final c = _toneColor(i['tone']?.toString() ?? 'cyan');
-            return Container(
-              margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.surfaceAlt),
-              ),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(
-                  width: 38, height: 38,
-                  decoration: BoxDecoration(
-                    color: c.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(_iconFor(i['icon']?.toString() ?? ''), color: c, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${i['title'] ?? ''}',
-                        style: TextStyle(color: c, fontSize: 14, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 3),
-                    Text('${i['msg'] ?? ''}',
-                        style: const TextStyle(color: AppColors.textDim, fontSize: 12.5, height: 1.35)),
-                  ]),
-                ),
-              ]),
-            );
-          }),
+          // Cifras clave (resumen rápido, sin duplicar Análisis)
+          _SummaryStats(stats: Map<String, dynamic>.from(data['stats'] as Map? ?? {})),
+
+          // Percentil global de SR (¿mejor que qué % de LFM?)
+          _SrPercentileCard(profileId: data['profile_id'] as int?),
 
           // Qué hacer ahora
           if (action.isNotEmpty)
@@ -301,7 +279,7 @@ class _SummaryTab extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft, end: Alignment.bottomRight,
-                  colors: [Color(0xFF16283C), Color(0xFF0D1B2E)],
+                  colors: [AppColors.surfaceAlt, AppColors.bg],
                 ),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: AppColors.gold.withValues(alpha: 0.5)),
@@ -318,7 +296,7 @@ class _SummaryTab extends StatelessWidget {
                   ),
                   alignment: Alignment.center,
                   child: Icon(_iconFor(action['icon']?.toString() ?? 'target'),
-                      color: const Color(0xFF0A1420), size: 22),
+                      color: AppColors.bg, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -337,6 +315,33 @@ class _SummaryTab extends StatelessWidget {
                 ),
               ]),
             ),
+
+          // Tendencia rating/SR
+          _TrendStrip(stats: Map<String, dynamic>.from(data['stats'] as Map? ?? {})),
+
+          // Acceso rápido: Clasificación + Logros
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+            child: Row(children: [
+              Expanded(
+                child: _ProfileActionCard(
+                  icon: Icons.emoji_events_rounded,
+                  label: 'Clasificación',
+                  sub: 'Tu posición en el campeonato',
+                  onTap: () => Navigator.of(context).pushNamed('/profile/standings'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ProfileActionCard(
+                  icon: Icons.military_tech_rounded,
+                  label: 'Logros',
+                  sub: 'Progreso y rating por sim',
+                  onTap: () => Navigator.of(context).pushNamed('/profile/achievements'),
+                ),
+              ),
+            ]),
+          ),
 
           // Glosario (¿qué significa cada cosa?)
           const SizedBox(height: 10),
@@ -415,7 +420,7 @@ class _AnalysisTab extends StatelessWidget {
       case 'red': return AppColors.red;
       case 'orange': return AppColors.gold;
       case 'green': return AppColors.green;
-      default: return AppColors.cyan;
+      default: return AppColors.gold;
     }
   }
 
@@ -431,7 +436,6 @@ class _AnalysisTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = (data['stats'] as Map? ?? {});
     final insights = (insight?['insights'] as List? ?? []);
 
     return ListView(
@@ -490,6 +494,9 @@ class _AnalysisTab extends StatelessWidget {
         _ActionRow(icon: Icons.timer_outlined, label: 'Sectores',
             sub: '¿Dónde pierdes el tiempo? Tus S1/S2/S3 vs el más rápido del split',
             onTap: () => onPush('/analysis/sectors')),
+        _ActionRow(icon: Icons.map_outlined, label: 'Circuito',
+            sub: '¿Cómo estás en cada trazado? Tu vuelta vs el récord, con mapa por sectores',
+            onTap: () => onPush('/analysis/circuit')),
         _ActionRow(icon: Icons.speed, label: 'Consistencia',
             sub: '¿Qué tan regulares son tus vueltas? Dónde se te va la constancia',
             onTap: () => onPush('/analysis/consistency')),
@@ -502,28 +509,7 @@ class _AnalysisTab extends StatelessWidget {
         _ActionRow(icon: Icons.compare_arrows, label: 'Comparar',
             sub: '¿Cómo estás frente a otros pilotos? Perfil vs perfil',
             onTap: () => onPush('/analysis/compare')),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.surfaceAlt),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Tus cifras',
-                style: TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 10),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              _MiniStat('${s['races'] ?? 0}', 'carreras'),
-              _MiniStat('${s['podiums'] ?? 0}', 'podios'),
-              _MiniStat('${s['avg_finish'] ?? '—'}', 'avg finish'),
-              _MiniStat('${s['avg_incidents'] ?? '—'}', 'avg inc.'),
-              _MiniStat('${s['best_of_week'] ?? 0}', 'BOW ⭐'),
-              _MiniStat('${s['best_finish'] ?? '—'}', 'mejor puesto'),
-            ]),
-          ]),
-        ),
+        const SizedBox(height: 8),
       ],
     );
   }
@@ -564,25 +550,6 @@ class _PriorityCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(msg, style: const TextStyle(color: AppColors.text, fontSize: 12.5, height: 1.4)),
         ])),
-      ]),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  final String value; final String label;
-  const _MiniStat(this.value, this.label);
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(children: [
-        Text(value, style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w900)),
-        Text(label, style: const TextStyle(color: AppColors.textDim, fontSize: 10)),
       ]),
     );
   }
@@ -657,6 +624,95 @@ class _AvatarFallback extends StatelessWidget {
   }
 }
 
+class _SummaryStats extends StatelessWidget {
+  final Map<String, dynamic> stats;
+  const _SummaryStats({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <(String, String, Color)>[
+      ('${stats['races'] ?? 0}', 'carreras', AppColors.gold),
+      ('${stats['podiums'] ?? 0}', 'podios', AppColors.gold),
+      ('${stats['podium_rate'] ?? 0}%', 'en podio', AppColors.green),
+      ('${stats['avg_incidents'] ?? '—'}', 'inc/carrera', AppColors.red),
+      ('${stats['best_of_week'] ?? 0}', '⭐ BOW', AppColors.gold),
+      ('#${stats['avg_finish'] ?? '—'}', 'finish med', AppColors.text),
+    ];
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.surfaceAlt),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Tus cifras',
+            style: TextStyle(color: AppColors.text, fontSize: 13, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 12),
+        Row(children: [
+          for (final (v, l, c) in items.take(3))
+            Expanded(child: _StatCell(v, l, c)),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          for (final (v, l, c) in items.skip(3))
+            Expanded(child: _StatCell(v, l, c)),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _StatCell extends StatelessWidget {
+  final String value; final String label; final Color color;
+  const _StatCell(this.value, this.label, this.color);
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      Text(value, style: TextStyle(color: color, fontSize: 17, fontWeight: FontWeight.w900)),
+      const SizedBox(height: 2),
+      Text(label, style: const TextStyle(color: AppColors.textDim, fontSize: 9.5)),
+    ]);
+  }
+}
+
+class _TrendStrip extends StatelessWidget {
+  final Map<String, dynamic> stats;
+  const _TrendStrip({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final rt = stats['rating_trend_5'];
+    final st = stats['sr_trend_5'];
+    if (rt == null && st == null) return const SizedBox.shrink();
+    final rUp = (rt as num).toDouble() >= 0;
+    final sUp = (st as num).toDouble() >= 0;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.surfaceAlt),
+      ),
+      child: Row(children: [
+        Icon(rUp ? Icons.trending_up : Icons.trending_down,
+            color: rUp ? AppColors.green : AppColors.red, size: 22),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Rating ${rUp ? '+' : ''}$rt pts · SR ${sUp ? '+' : ''}$st en las últimas 5 carreras',
+            style: const TextStyle(color: AppColors.text, fontSize: 12.5),
+          ),
+        ),
+        Icon(sUp ? Icons.arrow_upward : Icons.arrow_downward,
+            color: sUp ? AppColors.green : AppColors.red, size: 18),
+      ]),
+    );
+  }
+}
+
 class _Badge extends StatelessWidget {
   final String text; final Color color;
   const _Badge({required this.text, required this.color});
@@ -694,11 +750,11 @@ class _ActionRow extends StatelessWidget {
           Container(
             width: 32, height: 32,
             decoration: BoxDecoration(
-              color: AppColors.cyan.withValues(alpha: 0.13),
+              color: AppColors.gold.withValues(alpha: 0.13),
               borderRadius: BorderRadius.circular(9),
             ),
             alignment: Alignment.center,
-            child: Icon(icon, color: AppColors.cyan, size: 17),
+            child: Icon(icon, color: AppColors.gold, size: 17),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -735,6 +791,147 @@ class _ErrorView extends StatelessWidget {
           FilledButton(onPressed: onRetry, child: const Text('Reintentar')),
         ]),
       ),
+    );
+  }
+}
+
+/// Tarjeta de acceso rápido del Perfil (Clasificación / Logros).
+class _ProfileActionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String sub;
+  final VoidCallback onTap;
+  const _ProfileActionCard(
+      {required this.icon, required this.label, required this.sub, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: [AppColors.surfaceAlt, AppColors.surface],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  colors: [AppColors.goldLight, AppColors.gold],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, color: AppColors.bg, size: 22),
+            ),
+            const SizedBox(height: 10),
+            Text(label,
+                style: const TextStyle(color: AppColors.text, fontSize: 14, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 2),
+            Text(sub,
+                style: const TextStyle(color: AppColors.textDim, fontSize: 11), maxLines: 2),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Tarjeta de percentil global de SR: ¿mejor que qué % de la comunidad?
+/// Carga ligera (endpoint cacheado 24h en BD) — falla silencioso.
+class _SrPercentileCard extends StatefulWidget {
+  final int? profileId;
+  const _SrPercentileCard({this.profileId});
+  @override
+  State<_SrPercentileCard> createState() => _SrPercentileCardState();
+}
+
+class _SrPercentileCardState extends State<_SrPercentileCard> {
+  Map<String, dynamic>? _data;
+  bool _done = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final pid = widget.profileId;
+    if (pid == null) {
+      setState(() => _done = true);
+      return;
+    }
+    try {
+      final d = await ApiClient.get('/api/global/sr-percentile/$pid');
+      if (!mounted) return;
+      setState(() { _data = Map<String, dynamic>.from(d as Map); _done = true; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _done = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_done || _data == null) return const SizedBox.shrink();
+    final pct = (_data?['percentile'] as Map?);
+    if (pct == null) return const SizedBox.shrink();
+    final betterThan = (pct['better_than_pct'] as num?)?.toStringAsFixed(1);
+    final avg = (_data?['distribution'] as Map?)?['average_sr'] as num?;
+    final overall = (_data?['distribution'] as Map?)?['overall'] as num?;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: [AppColors.surfaceAlt, AppColors.bg],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
+      ),
+      child: Row(children: [
+        Container(
+          width: 44, height: 44,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: [AppColors.goldLight, AppColors.gold],
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
+          child: const Icon(Icons.public_rounded, color: AppColors.bg, size: 24),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('TU SR EN LA COMUNIDAD',
+                style: TextStyle(color: AppColors.gold, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+            const SizedBox(height: 4),
+            Text('Mejor que el $betterThan% de LFM',
+                style: const TextStyle(color: AppColors.text, fontSize: 15, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 2),
+            Text(avg != null && overall != null
+                ? 'Media global ${avg.toStringAsFixed(2)} · $overall pilotos'
+                : 'Distribución global de Safety Rating',
+                style: const TextStyle(color: AppColors.textDim, fontSize: 11.5)),
+          ]),
+        ),
+      ]),
     );
   }
 }

@@ -34,11 +34,11 @@ class _ProgressionScreenState extends State<ProgressionScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Progresión')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.gold))
+          ? const LoadingView()
           : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.red)))
+              ? ErrorView(message: _error!, onRetry: _load)
               : _data!.isEmpty
-                  ? const Center(child: Text('Sin datos', style: TextStyle(color: AppColors.textDim)))
+                  ? const EmptyView(icon: Icons.show_chart, message: 'Sin datos todavía.\nSincroniza para ver tu evolución.')
                   : _chart(),
     );
   }
@@ -68,7 +68,7 @@ class _ProgressionScreenState extends State<ProgressionScreen> {
         ...pts.reversed.map((p) {
           final pos = (p['finish_pos'] as num).toInt();
           final Color posColor = pos == 1 ? AppColors.gold
-              : pos <= 3 ? AppColors.cyan : AppColors.text;
+              : pos <= 3 ? AppColors.green : AppColors.text;
           final rating = (p['rating'] as num).round();
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
